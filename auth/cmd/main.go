@@ -12,6 +12,7 @@ func main() {
 	router := gin.Default()
 
 	database, err := db.InitDB()
+	db.MigrateDB(database)
 	if err != nil {
 		panic(err)
 	}
@@ -21,7 +22,7 @@ func main() {
 			"message": "pong",
 		})
 	})
-	api := router.Group("/api/v1/fencer")
+	api := router.Group("/api/v1/auth")
 	routes.AuthRouter(api, database)
 	router.Run()
 }

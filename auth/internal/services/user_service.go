@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/jsndz/authforge/internal/model"
@@ -58,6 +59,7 @@ func (s *UserService) Login(email, password string) (*model.User, error) {
 
 	ok, err := security.VerifyPassword(password, user.Password)
 	if err != nil || !ok {
+		log.Printf("Login failed for email %s: %v", email, err)
 		return nil, errors.New("invalid credentials")
 	}
 
