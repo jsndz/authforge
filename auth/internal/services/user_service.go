@@ -8,10 +8,12 @@ import (
 	"github.com/jsndz/authforge/internal/model"
 	"github.com/jsndz/authforge/internal/repository"
 	"github.com/jsndz/authforge/internal/security"
+	"github.com/jsndz/authforge/pkg/email"
 )
 
 type UserService struct {
 	userRepository *repository.UserRepository
+	tokenService   *TokenService
 }
 
 func NewUserService(repo *repository.UserRepository) *UserService {
@@ -20,9 +22,9 @@ func NewUserService(repo *repository.UserRepository) *UserService {
 	}
 }
 
-func (s *UserService) Register(username, email, password string) (*model.User, error) {
+func (s *UserService) Register(username, useremail, password string) (*model.User, error) {
 
-	exists, err := s.userRepository.EmailExists(email)
+	exists, err := s.userRepository.EmailExists(useremail)
 	if err != nil {
 		return nil, err
 	}
@@ -38,28 +40,37 @@ func (s *UserService) Register(username, email, password string) (*model.User, e
 
 	user := &model.User{
 		UserName: username,
-		Email:    email,
+		Email:    useremail,
 		Password: hash,
+	}
+
+	token, err := s.tokenService.GetToken(user.ID, model.TokenEmailVerification)
+	if err != nil {
+		return nil, err
 	}
 
 	err = s.userRepository.Create(user)
 	if err != nil {
 		return nil, err
 	}
-
+	emailService := email.NewEmailService()
+	err = emailService.SendEmailVerification(user.Email, token)
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
 }
 
-func (s *UserService) Login(email, password string) (*model.User, error) {
+func (s *UserService) Login(useremail, password string) (*model.User, error) {
 
-	user, err := s.userRepository.FindByEmail(email)
+	user, err := s.userRepository.FindByEmail(useremail)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
 	ok, err := security.VerifyPassword(password, user.Password)
 	if err != nil || !ok {
-		log.Printf("Login failed for email %s: %v", email, err)
+		log.Printf("Login failed for email %s: %v", useremail, err)
 		return nil, errors.New("invalid credentials")
 	}
 

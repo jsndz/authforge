@@ -11,4 +11,7 @@ func AuthRouter(router *gin.RouterGroup, db *gorm.DB) {
 
 	router.POST("/signup", userhandler.Register)
 	router.POST("/login", userhandler.Login)
+
+	tokenHandler := bootstrap.InitTokenModule(db)
+	router.GET("/email/verify", tokenHandler.VerifyEmailToken)
 }

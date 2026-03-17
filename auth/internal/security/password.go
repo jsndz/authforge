@@ -28,7 +28,6 @@ var DefaultParams = &Params{
 }
 
 func HashPassword(password string, params *Params) (string, error) {
-	slog.Debug("hashing password")
 	if params == nil {
 		params = DefaultParams
 	}
@@ -36,7 +35,6 @@ func HashPassword(password string, params *Params) (string, error) {
 
 	_, err := rand.Read(salt)
 	if err != nil {
-		slog.Error("failed to generate salt", "error", err)
 		return "", err
 	}
 	hash := argon2.IDKey([]byte(password), salt, params.Iterations, params.Memory, params.Parallelism, params.KeyLength)
@@ -51,12 +49,10 @@ func HashPassword(password string, params *Params) (string, error) {
 		b64Salt,
 		b64Hash,
 	)
-	slog.Debug("password hashed successfully", "encoded", encoded)
 	return encoded, nil
 }
 
 func VerifyPassword(password, encodedHash string) (bool, error) {
-	slog.Debug("verifying password")
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 5 {
 		slog.Error("invalid hash format", "parts", len(parts))
@@ -71,20 +67,16 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 
 	salt, err := base64.RawStdEncoding.DecodeString(parts[3])
 	if err != nil {
-		slog.Error("failed to decode salt", "error", err)
 		return false, err
 	}
 
 	hash, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
-		slog.Error("failed to decode hash", "error", err)
 		return false, err
 	}
 	newHash := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(hash)))
 	if subtle.ConstantTimeCompare(hash, newHash) == 1 {
-		slog.Debug("password verification succeeded")
 		return true, nil
 	}
-	slog.Debug("password verification failed")
 	return false, nil
 }
