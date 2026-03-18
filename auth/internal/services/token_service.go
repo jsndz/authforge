@@ -38,22 +38,29 @@ func (s *TokenService) GetToken(userID uint, tokenType model.TokenType) (string,
 	return token, nil
 }
 
-func (s *TokenService) VerifyToken(rawToken string, tokenType model.TokenType) (bool, error) {
+func (s *TokenService) VerifyToken(rawToken string, tokenType model.TokenType) (*model.Token, error) {
 	hash := sha256.Sum256([]byte(rawToken))
 	hashedToken := hex.EncodeToString(hash[:])
 
 	token, err := s.TokenRepository.GetOnHash(hashedToken, tokenType)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	if token.ExpiresAt < time.Now().Unix() {
-		return false, nil
+		return nil, nil
 	}
 
 	if token.UsedAt != 0 {
-		return false, nil
+		return nil, nil
 	}
+	return token, nil
+}
 
-	return true, nil
+func (s *TokenService) MarkTokenAsUsed(token *model.Token) error {
+	if token.ExpiresAt < time.Now().Unix() {
+		return nil
+	}
+	token.UsedAt = time.Now().Unix()
+	return s.TokenRepository.MarkAsUsed(token.ID)
 }

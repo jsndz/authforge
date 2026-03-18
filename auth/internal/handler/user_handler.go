@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jsndz/authforge/internal/model"
 	"github.com/jsndz/authforge/internal/services"
 )
 
@@ -82,5 +83,34 @@ func (h *UserHandler) Login(c *gin.Context) {
 		"id":       user.ID,
 		"username": user.UserName,
 		"email":    user.Email,
+	})
+}
+
+func (h *UserHandler) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "token is required",
+		})
+		return
+	}
+
+	ok, err := h.UserService.VerifyEmail(token, model.TokenEmailVerification)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid or expired token",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "email verified successfully",
 	})
 }

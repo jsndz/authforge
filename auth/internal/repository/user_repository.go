@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/jsndz/authforge/internal/model"
 	"gorm.io/gorm"
 )
@@ -59,6 +61,7 @@ func (r *UserRepository) Update(user *model.User) error {
 func (r *UserRepository) Delete(id uint) error {
 	return r.db.Delete(&model.User{}, id).Error
 }
+
 func (r *UserRepository) EmailExists(email string) (bool, error) {
 	var count int64
 
@@ -67,4 +70,13 @@ func (r *UserRepository) EmailExists(email string) (bool, error) {
 		Count(&count).Error
 
 	return count > 0, err
+}
+
+func (r *UserRepository) UpdateVerification(verified bool, userId uint) error {
+	return r.db.Model(&model.User{}).
+		Where("id = ?", userId).
+		Updates(map[string]interface{}{
+			"email_verified": verified,
+			"updated_at":     time.Now(),
+		}).Error
 }

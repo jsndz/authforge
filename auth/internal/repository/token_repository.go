@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/jsndz/authforge/internal/model"
 	"gorm.io/gorm"
 )
@@ -16,6 +18,7 @@ func NewTokenRepository(DB *gorm.DB) *TokenRepository {
 }
 
 func (r *TokenRepository) Create(token *model.Token) error {
+
 	return r.db.Create(token).Error
 }
 
@@ -41,4 +44,8 @@ func (r *TokenRepository) Delete(id uint) (*model.Token, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+func (r *TokenRepository) MarkAsUsed(id uint) error {
+	return r.db.Model(&model.Token{}).Where("id = ?", id).Update("used_at", time.Now().Unix()).Error
 }

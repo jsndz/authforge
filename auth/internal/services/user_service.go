@@ -96,3 +96,27 @@ func (s *UserService) DeactivateUser(id uint) error {
 
 	return s.userRepository.Update(user)
 }
+
+func (s *UserService) VerifyEmail(rawToken string, tokenType model.TokenType) (bool, error) {
+
+	token, err := s.tokenService.VerifyToken(rawToken, tokenType)
+	if err != nil {
+		return false, err
+	}
+
+	if token.ExpiresAt < time.Now().Unix() {
+		return false, nil
+	}
+
+	if token.UsedAt != 0 {
+		return false, nil
+	}
+	if err := s.userRepository.UpdateVerification(true, token.UserID); err != nil {
+		return false, err
+	}
+
+	if err := s.tokenService.MarkTokenAsUsed(token); err != nil {
+		return false, err
+	}
+	return true, nil
+}
