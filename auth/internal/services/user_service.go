@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/jsndz/authforge/internal/model"
@@ -14,15 +13,41 @@ import (
 type UserService struct {
 	userRepository *repository.UserRepository
 	tokenService   *TokenService
+	sessionService *SessionService
+	emailService   *email.EmailService
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+type UserResponse struct {
+	ID       uint   `json:"id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
+
+type LoginResponse struct {
+	User         UserResponse `json:"user"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+}
+
+func NewUserService(
+	repo *repository.UserRepository,
+	tokenService *TokenService,
+	sessionService *SessionService,
+	emailService *email.EmailService,
+) *UserService {
 	return &UserService{
 		userRepository: repo,
+		tokenService:   tokenService,
+		sessionService: sessionService,
+		emailService:   emailService,
 	}
 }
 
 func (s *UserService) Register(username, useremail, password string) (*model.User, error) {
+
+	if username == "" || useremail == "" || password == "" {
+		return nil, errors.New("all fields are required")
+	}
 
 	exists, err := s.userRepository.EmailExists(useremail)
 	if err != nil {
@@ -42,6 +67,12 @@ func (s *UserService) Register(username, useremail, password string) (*model.Use
 		UserName: username,
 		Email:    useremail,
 		Password: hash,
+		IsActive: true,
+	}
+
+	err = s.userRepository.Create(user)
+	if err != nil {
+		return nil, err
 	}
 
 	token, err := s.tokenService.GetToken(user.ID, model.TokenEmailVerification)
@@ -49,28 +80,31 @@ func (s *UserService) Register(username, useremail, password string) (*model.Use
 		return nil, err
 	}
 
-	err = s.userRepository.Create(user)
+	err = s.emailService.SendEmailVerification(user.Email, token)
 	if err != nil {
 		return nil, err
 	}
-	emailService := email.NewEmailService()
-	err = emailService.SendEmailVerification(user.Email, token)
-	if err != nil {
-		return nil, err
-	}
+
 	return user, nil
 }
 
-func (s *UserService) Login(useremail, password string) (*model.User, error) {
+func (s *UserService) Login(useremail, password string) (*LoginResponse, error) {
 
 	user, err := s.userRepository.FindByEmail(useremail)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
+	if !user.IsActive {
+		return nil, errors.New("account is deactivated")
+	}
+
+	if !user.EmailVerified {
+		return nil, errors.New("email not verified")
+	}
+
 	ok, err := security.VerifyPassword(password, user.Password)
 	if err != nil || !ok {
-		log.Printf("Login failed for email %s: %v", useremail, err)
 		return nil, errors.New("invalid credentials")
 	}
 
@@ -82,7 +116,20 @@ func (s *UserService) Login(useremail, password string) (*model.User, error) {
 		return nil, err
 	}
 
-	return user, nil
+	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginResponse{
+		User: UserResponse{
+			ID:       user.ID,
+			Email:    user.Email,
+			Username: user.UserName,
+		},
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func (s *UserService) DeactivateUser(id uint) error {
@@ -92,31 +139,55 @@ func (s *UserService) DeactivateUser(id uint) error {
 		return err
 	}
 
+	if !user.IsActive {
+		return errors.New("user already deactivated")
+	}
+
 	user.IsActive = false
 
 	return s.userRepository.Update(user)
 }
 
-func (s *UserService) VerifyEmail(rawToken string, tokenType model.TokenType) (bool, error) {
+func (s *UserService) VerifyEmail(rawToken string, tokenType model.TokenType) (LoginResponse, error) {
 
 	token, err := s.tokenService.VerifyToken(rawToken, tokenType)
 	if err != nil {
-		return false, err
+		return LoginResponse{}, err
 	}
 
 	if token.ExpiresAt < time.Now().Unix() {
-		return false, nil
+		return LoginResponse{}, errors.New("token expired")
 	}
 
 	if token.UsedAt != 0 {
-		return false, nil
+		return LoginResponse{}, errors.New("token already used")
 	}
+
+	user, err := s.userRepository.FindByID(token.UserID)
+	if err != nil {
+		return LoginResponse{}, err
+	}
+
 	if err := s.userRepository.UpdateVerification(true, token.UserID); err != nil {
-		return false, err
+		return LoginResponse{}, err
 	}
 
 	if err := s.tokenService.MarkTokenAsUsed(token); err != nil {
-		return false, err
+		return LoginResponse{}, err
 	}
-	return true, nil
+
+	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(token.UserID)
+	if err != nil {
+		return LoginResponse{}, err
+	}
+
+	return LoginResponse{
+		User: UserResponse{
+			ID:       user.ID,
+			Email:    user.Email,
+			Username: user.UserName,
+		},
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }

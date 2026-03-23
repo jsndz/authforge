@@ -2,14 +2,12 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/jsndz/authforge/internal/bootstrap"
-	"gorm.io/gorm"
+	"github.com/jsndz/authforge/internal/handler"
 )
 
-func AuthRouter(router *gin.RouterGroup, db *gorm.DB) {
-	userhandler := bootstrap.InitAuthModule(db)
+func AuthRouter(router *gin.RouterGroup, userHandler *handler.UserHandler, tokenHandler *handler.TokenHandler) {
 
-	router.POST("/signup", userhandler.Register)
-	router.POST("/login", userhandler.Login)
-	router.GET("/email/verify", userhandler.VerifyEmail)
+	router.POST("/signup", userHandler.Register)
+	router.POST("/login", userHandler.Login)
+	router.GET("/email/verify", userHandler.VerifyEmail)
 }

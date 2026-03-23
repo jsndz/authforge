@@ -3,15 +3,13 @@ package db
 import (
 	"log"
 
-	"github.com/jsndz/authforge/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func InitDB() (*gorm.DB, error) {
-	cfg := config.Load()
+func InitDB(URL string) (*gorm.DB, error) {
 
-	db, err := gorm.Open(postgres.Open(cfg.DBConnectURL), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(URL), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Coudn't run postgres")
 	}

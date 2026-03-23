@@ -62,7 +62,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
-	//automatically validates body with req
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
@@ -78,11 +77,12 @@ func (h *UserHandler) Login(c *gin.Context) {
 		})
 		return
 	}
-
+	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
 	c.JSON(http.StatusCreated, gin.H{
-		"id":       user.ID,
-		"username": user.UserName,
-		"email":    user.Email,
+		"access_token":  user.AccessToken,
+		"refresh_token": user.RefreshToken,
+		"username":      user.User.Username,
+		"email":         user.User.Email,
 	})
 }
 
@@ -95,7 +95,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	ok, err := h.UserService.VerifyEmail(token, model.TokenEmailVerification)
+	user, err := h.UserService.VerifyEmail(token, model.TokenEmailVerification)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -103,14 +103,11 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid or expired token",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "email verified successfully",
+	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
+	c.JSON(http.StatusCreated, gin.H{
+		"access_token":  user.AccessToken,
+		"refresh_token": user.RefreshToken,
+		"username":      user.User.Username,
+		"email":         user.User.Email,
 	})
 }

@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	DBConnectURL string
+	JWTSecret    string
 }
 
 func Load() *Config {
@@ -18,6 +19,7 @@ func Load() *Config {
 	}
 
 	return &Config{
+		JWTSecret:    os.Getenv("JWT_SECRET"),
 		DBConnectURL: os.Getenv("DB_CONNECT_URL"),
 	}
 }
