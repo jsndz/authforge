@@ -72,8 +72,8 @@ func (h *UserHandler) Login(c *gin.Context) {
 		})
 		return
 	}
-
-	user, err := h.UserService.Login(c, req.Email, req.Password)
+	ip := c.ClientIP()
+	user, err := h.UserService.Login(c, req.Email, req.Password, ip)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{

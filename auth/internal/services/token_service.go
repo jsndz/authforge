@@ -42,16 +42,13 @@ func (s *TokenService) GetToken(userID uint, tokenType model.TokenType) (string,
 
 func (s *TokenService) VerifyToken(rawToken string, tokenType model.TokenType) (*model.Token, error) {
 	hashedToken := util.HashTokenWithSha256(rawToken)
-
 	token, err := s.TokenRepository.GetOnHash(hashedToken, tokenType)
 	if err != nil {
 		return nil, err
 	}
-
 	if token.ExpiresAt < time.Now().Unix() {
 		return nil, errors.New("token expired")
 	}
-
 	if token.UsedAt != 0 {
 		return nil, errors.New("token already used")
 	}

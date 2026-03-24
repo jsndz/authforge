@@ -10,6 +10,7 @@ import (
 	"github.com/jsndz/authforge/internal/repository"
 	"github.com/jsndz/authforge/internal/security"
 	"github.com/jsndz/authforge/pkg/email"
+	"github.com/redis/go-redis/v9"
 )
 
 type UserService struct {
@@ -17,6 +18,7 @@ type UserService struct {
 	tokenService   *TokenService
 	sessionService *SessionService
 	emailService   *email.EmailService
+	redis          *redis.Client
 }
 
 type UserResponse struct {
@@ -36,12 +38,13 @@ func NewUserService(
 	tokenService *TokenService,
 	sessionService *SessionService,
 	emailService *email.EmailService,
-) *UserService {
+	redis *redis.Client) *UserService {
 	return &UserService{
 		userRepository: repo,
 		tokenService:   tokenService,
 		sessionService: sessionService,
 		emailService:   emailService,
+		redis:          redis,
 	}
 }
 
@@ -92,8 +95,10 @@ func (s *UserService) Register(username, useremail, password string) (*model.Use
 	return user, nil
 }
 
-func (s *UserService) Login(ctx context.Context, useremail, password string) (*LoginResponse, error) {
-
+func (s *UserService) Login(ctx context.Context, useremail, password, ip string) (*LoginResponse, error) {
+	if err := s.IsBlocked(ctx, useremail, ip); err != nil {
+		return nil, err
+	}
 	user, err := s.userRepository.FindByEmail(useremail)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
@@ -109,8 +114,10 @@ func (s *UserService) Login(ctx context.Context, useremail, password string) (*L
 
 	ok, err := security.VerifyPassword(password, user.Password)
 	if err != nil || !ok {
+		_ = s.RecordLoginFailure(ctx, useremail, ip)
 		return nil, errors.New("invalid credentials")
 	}
+	s.ResetLoginAttempts(ctx, useremail, ip)
 
 	now := time.Now()
 	user.LastLoginAt = &now
@@ -207,4 +214,57 @@ func (s *UserService) UpdateUsername(userID uint, username string) (*model.User,
 	}
 
 	return user, nil
+}
+
+func (s *UserService) IsBlocked(ctx context.Context, email, ip string) error {
+	emailKey := "login:fail:user:" + email
+	ipKey := "login:fail:ip:" + ip
+
+	emailCount, err := s.redis.Get(ctx, emailKey).Int()
+	if err == redis.Nil {
+		emailCount = 0
+	} else if err != nil {
+		return err
+	}
+
+	ipCount, err := s.redis.Get(ctx, ipKey).Int()
+	if err == redis.Nil {
+		ipCount = 0
+	} else if err != nil {
+		return err
+	}
+
+	if emailCount >= 5 || ipCount >= 5 {
+		return errors.New("too many login attempts, try again later")
+	}
+
+	return nil
+}
+
+func (s *UserService) RecordLoginFailure(ctx context.Context, email, ip string) error {
+	emailKey := "login:fail:user:" + email
+	ipKey := "login:fail:ip:" + ip
+
+	count, err := s.redis.Incr(ctx, emailKey).Result()
+	if err != nil {
+		return err
+	}
+	if count == 1 {
+		s.redis.Expire(ctx, emailKey, 10*time.Minute)
+	}
+
+	count, err = s.redis.Incr(ctx, ipKey).Result()
+	if err != nil {
+		return err
+	}
+	if count == 1 {
+		s.redis.Expire(ctx, ipKey, 10*time.Minute)
+	}
+
+	return nil
+}
+
+func (s *UserService) ResetLoginAttempts(ctx context.Context, email, ip string) {
+	s.redis.Del(ctx, "login:fail:user:"+email)
+	s.redis.Del(ctx, "login:fail:ip:"+ip)
 }
