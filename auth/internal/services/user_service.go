@@ -59,7 +59,9 @@ func (s *UserService) Register(username, useremail, password string) (*model.Use
 	if exists {
 		return nil, errors.New("email already registered")
 	}
-
+	if err := security.PasswordStrengthValidation(password); err != nil {
+		return nil, err
+	}
 	hash, err := security.HashPassword(password, security.DefaultParams)
 	if err != nil {
 		return nil, err

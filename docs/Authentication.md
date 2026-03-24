@@ -35,3 +35,14 @@ on logput just say that they are blacklisted
 Authentication also includes middleware for some endpoints also called as protected routes
 Like /me only logged in user should be able to get in.
 Made a middleware for authentication
+
+
+
+Validation in MICROSERVICES:
+
+the auth service can't be called everytime you need to verify the user
+so in microservice
+2 ways to do it:
+
+Gateway handles the verification(tightly coupled)
+Each service has user authentication middleware(repeated code)
