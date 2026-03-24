@@ -29,6 +29,10 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type UpdateUsernameRequest struct {
+	Username string `json:"username" binding:"required"`
+}
+
 func (h *UserHandler) Register(c *gin.Context) {
 
 	var req RegisterRequest
@@ -131,4 +135,36 @@ func (h *UserHandler) Logout(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
 
 	c.JSON(200, gin.H{"message": "logged out"})
+}
+
+func (h *UserHandler) UpdateUsername(c *gin.Context) {
+	var req UpdateUsernameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	updatedUser, err := h.UserService.UpdateUsername(userID, req.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":       updatedUser.ID,
+		"username": updatedUser.UserName,
+		"email":    updatedUser.Email,
+	})
 }

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jsndz/authforge/internal/model"
@@ -181,4 +182,27 @@ func (s *UserService) VerifyEmail(ctx context.Context, rawToken string, tokenTyp
 		RefreshToken: refreshToken,
 	}, nil
 
+}
+
+func (s *UserService) UpdateUsername(userID uint, username string) (*model.User, error) {
+	newUsername := strings.TrimSpace(username)
+	if newUsername == "" {
+		return nil, errors.New("username is required")
+	}
+
+	user, err := s.userRepository.FindByID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.UserName == newUsername {
+		return user, nil
+	}
+
+	user.UserName = newUsername
+	if err := s.userRepository.Update(user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }

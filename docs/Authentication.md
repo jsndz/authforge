@@ -29,3 +29,9 @@ Refresh token need to be sent as a cookie
 
 Will blacklist access_token since they are stateless and can't be tracked 
 on logput just say that they are blacklisted
+
+
+
+Authentication also includes middleware for some endpoints also called as protected routes
+Like /me only logged in user should be able to get in.
+Made a middleware for authentication

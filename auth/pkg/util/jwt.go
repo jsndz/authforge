@@ -1,4 +1,4 @@
-package security
+package util
 
 import (
 	"time"

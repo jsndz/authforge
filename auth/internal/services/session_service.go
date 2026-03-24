@@ -25,7 +25,7 @@ func NewSessionService(secret string, redisClient *redis.Client) *SessionService
 }
 
 func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (string, string, error) {
-	accessToken, err := security.CreateJWT(UserId, 15*time.Minute, s.jwtSecret)
+	accessToken, err := util.CreateJWT(UserId, 15*time.Minute, s.jwtSecret)
 	if err != nil {
 		return "", "", err
 	}
@@ -36,11 +36,6 @@ func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (
 	hashedRefreshToken := util.HashTokenWithSha256(refreshToken)
 	s.redis.Set(ctx, fmt.Sprintf("refresh:%s", hashedRefreshToken), UserId, 7*24*time.Hour)
 	return accessToken, refreshToken, err
-}
-
-func (s *SessionService) ValidateAccessToken(token string) (uint, error) {
-	return security.ValidateJWT(token, s.jwtSecret)
-
 }
 
 func (s *SessionService) ValidateRefreshToken(ctx context.Context, refreshToken string) (uint, error) {
