@@ -79,3 +79,11 @@ Great question—this is a core concept in authentication design, and understand
 
 ---
 
+
+
+
+Session ending:
+
+Ending session is easy just remove the refresh token and remove the cookie for refresh token
+And Blacklist the access token since they are stateless and cant be tracked by the system
+if that token comes just block it.![alt text](image.png)

@@ -72,11 +72,17 @@ func (r *UserRepository) EmailExists(email string) (bool, error) {
 	return count > 0, err
 }
 
-func (r *UserRepository) UpdateVerification(verified bool, userId uint) error {
-	return r.db.Model(&model.User{}).
+func (r *UserRepository) UpdateVerification(verified bool, userId uint) (*model.User, error) {
+	var user model.User
+
+	err := r.db.Model(&model.User{}).
 		Where("id = ?", userId).
 		Updates(map[string]interface{}{
 			"email_verified": verified,
 			"updated_at":     time.Now(),
 		}).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

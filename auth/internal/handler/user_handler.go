@@ -69,7 +69,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.UserService.Login(req.Email, req.Password)
+	user, err := h.UserService.Login(c, req.Email, req.Password)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -79,10 +79,9 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
 	c.JSON(http.StatusCreated, gin.H{
-		"access_token":  user.AccessToken,
-		"refresh_token": user.RefreshToken,
-		"username":      user.User.Username,
-		"email":         user.User.Email,
+		"access_token": user.AccessToken,
+		"username":     user.User.Username,
+		"email":        user.User.Email,
 	})
 }
 
@@ -95,7 +94,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	user, err := h.UserService.VerifyEmail(token, model.TokenEmailVerification)
+	user, err := h.UserService.VerifyEmail(c, token, model.TokenEmailVerification)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -105,9 +104,31 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 
 	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
 	c.JSON(http.StatusCreated, gin.H{
-		"access_token":  user.AccessToken,
-		"refresh_token": user.RefreshToken,
-		"username":      user.User.Username,
-		"email":         user.User.Email,
+		"access_token": user.AccessToken,
+		"username":     user.User.Username,
+		"email":        user.User.Email,
 	})
+}
+
+func (h *UserHandler) Logout(c *gin.Context) {
+
+	refreshToken, _ := c.Cookie("refresh_token")
+	accessToken := c.GetHeader("Authorization")
+	accessToken = accessToken[len("Bearer "):]
+
+	if refreshToken == "" || accessToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "refresh token and access token are required",
+		})
+		return
+	}
+	err := h.UserService.Logout(c, refreshToken, accessToken)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+
+	c.JSON(200, gin.H{"message": "logged out"})
 }

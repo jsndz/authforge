@@ -5,4 +5,6 @@
 5. Add a token model for various tokens 
 6. Connect to redis
 7. Sessions
-
+8. Jwt as Refresh
+9. Signup.png
+10. Signin.png

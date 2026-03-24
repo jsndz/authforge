@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -88,7 +89,7 @@ func (s *UserService) Register(username, useremail, password string) (*model.Use
 	return user, nil
 }
 
-func (s *UserService) Login(useremail, password string) (*LoginResponse, error) {
+func (s *UserService) Login(ctx context.Context, useremail, password string) (*LoginResponse, error) {
 
 	user, err := s.userRepository.FindByEmail(useremail)
 	if err != nil {
@@ -116,7 +117,7 @@ func (s *UserService) Login(useremail, password string) (*LoginResponse, error) 
 		return nil, err
 	}
 
-	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(user.ID)
+	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(ctx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +131,11 @@ func (s *UserService) Login(useremail, password string) (*LoginResponse, error) 
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+}
+
+func (s *UserService) Logout(ctx context.Context, RefreshToken string, accessToken string) error {
+	s.sessionService.BlacklistToken(ctx, accessToken, 15*time.Minute)
+	return s.sessionService.RevokeToken(ctx, RefreshToken)
 }
 
 func (s *UserService) DeactivateUser(id uint) error {
@@ -148,35 +154,19 @@ func (s *UserService) DeactivateUser(id uint) error {
 	return s.userRepository.Update(user)
 }
 
-func (s *UserService) VerifyEmail(rawToken string, tokenType model.TokenType) (LoginResponse, error) {
+func (s *UserService) VerifyEmail(ctx context.Context, rawToken string, tokenType model.TokenType) (LoginResponse, error) {
 
 	token, err := s.tokenService.VerifyToken(rawToken, tokenType)
 	if err != nil {
 		return LoginResponse{}, err
 	}
 
-	if token.ExpiresAt < time.Now().Unix() {
-		return LoginResponse{}, errors.New("token expired")
-	}
-
-	if token.UsedAt != 0 {
-		return LoginResponse{}, errors.New("token already used")
-	}
-
-	user, err := s.userRepository.FindByID(token.UserID)
+	user, err := s.userRepository.UpdateVerification(true, token.UserID)
 	if err != nil {
 		return LoginResponse{}, err
 	}
 
-	if err := s.userRepository.UpdateVerification(true, token.UserID); err != nil {
-		return LoginResponse{}, err
-	}
-
-	if err := s.tokenService.MarkTokenAsUsed(token); err != nil {
-		return LoginResponse{}, err
-	}
-
-	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(token.UserID)
+	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(ctx, token.UserID)
 	if err != nil {
 		return LoginResponse{}, err
 	}
@@ -190,4 +180,5 @@ func (s *UserService) VerifyEmail(rawToken string, tokenType model.TokenType) (L
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+
 }

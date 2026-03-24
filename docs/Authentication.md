@@ -23,3 +23,9 @@ New access token
 New refresh token
 Sends both back
 Every refresh -> rotation
+
+Refresh token need to be sent as a cookie
+
+
+Will blacklist access_token since they are stateless and can't be tracked 
+on logput just say that they are blacklisted

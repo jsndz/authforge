@@ -25,7 +25,7 @@ func main() {
 			"message": "pong",
 		})
 	})
-	app := bootstrap.InitApp(database, cfg.JWTSecret)
+	app := bootstrap.InitApp(database, redis, cfg.JWTSecret)
 	api := router.Group("/api/v1/auth")
 	routes.AuthRouter(api, app.UserHandler, app.TokenHandler)
 	router.Run()

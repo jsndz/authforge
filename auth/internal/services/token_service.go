@@ -3,11 +3,13 @@ package services
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	"github.com/jsndz/authforge/internal/model"
 	"github.com/jsndz/authforge/internal/repository"
 	"github.com/jsndz/authforge/internal/security"
+	"github.com/jsndz/authforge/pkg/util"
 )
 
 type TokenService struct {
@@ -39,8 +41,7 @@ func (s *TokenService) GetToken(userID uint, tokenType model.TokenType) (string,
 }
 
 func (s *TokenService) VerifyToken(rawToken string, tokenType model.TokenType) (*model.Token, error) {
-	hash := sha256.Sum256([]byte(rawToken))
-	hashedToken := hex.EncodeToString(hash[:])
+	hashedToken := util.HashTokenWithSha256(rawToken)
 
 	token, err := s.TokenRepository.GetOnHash(hashedToken, tokenType)
 	if err != nil {
@@ -48,11 +49,14 @@ func (s *TokenService) VerifyToken(rawToken string, tokenType model.TokenType) (
 	}
 
 	if token.ExpiresAt < time.Now().Unix() {
-		return nil, nil
+		return nil, errors.New("token expired")
 	}
 
 	if token.UsedAt != 0 {
-		return nil, nil
+		return nil, errors.New("token already used")
+	}
+	if err := s.MarkTokenAsUsed(token); err != nil {
+		return nil, err
 	}
 	return token, nil
 }
