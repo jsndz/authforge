@@ -310,3 +310,17 @@ func (s *UserService) RequestPasswordReset(ctx context.Context, email string) er
 func (s *UserService) CompleteLogout(ctx context.Context, userId uint) error {
 	return s.sessionService.AllSessionLogout(ctx, userId)
 }
+
+func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+	userId, err := s.sessionService.ValidateRefreshToken(ctx, refreshToken)
+	if err != nil {
+		s.sessionService.AllSessionLogout(ctx, userId)
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	err = s.sessionService.DeleteToken(ctx, refreshToken)
+	if err != nil {
+		return "", "", errors.New("failed to delete refresh token")
+	}
+	return s.sessionService.CreateSessionTokens(ctx, userId)
+}

@@ -227,3 +227,21 @@ func (h *UserHandler) CompleteLogout(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out from all sessions"})
 }
+
+func (h *UserHandler) RefreshToken(c *gin.Context) {
+
+	refreshToken, err := c.Cookie("refresh_token")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh token is required"})
+		return
+	}
+
+	accessToken, refreshToken, err := h.UserService.RefreshToken(c, refreshToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", "", true, true)
+	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
+}

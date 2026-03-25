@@ -45,6 +45,9 @@ func (s *SessionService) ValidateRefreshToken(ctx context.Context, refreshToken 
 	key := "refresh:" + hex.EncodeToString(hash[:])
 
 	userID, err := s.redis.Get(ctx, key).Uint64()
+	if err == redis.Nil {
+		return 0, fmt.Errorf("invalid or reused token")
+	}
 	if err != nil {
 		return 0, fmt.Errorf("invalid refresh token")
 	}
@@ -72,5 +75,17 @@ func (s *SessionService) AllSessionLogout(ctx context.Context, userID uint) erro
 		s.redis.Del(ctx, fmt.Sprintf("refresh:%s", key))
 	}
 	s.redis.Del(ctx, fmt.Sprintf("user_session:%d", userID))
+	return nil
+}
+
+func (s *SessionService) DeleteToken(ctx context.Context, token string) error {
+	hashedToken := util.HashTokenWithSha256(token)
+	userID, err := s.redis.Get(ctx, "refresh:"+hashedToken).Uint64()
+	if err != nil {
+		return err
+	}
+	s.redis.Del(ctx, fmt.Sprintf("refresh:%s", hashedToken))
+	s.redis.SRem(ctx, fmt.Sprintf("user_session:%d", userID), hashedToken)
+
 	return nil
 }
