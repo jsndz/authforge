@@ -1,9 +1,6 @@
-- [] password strength validation
-- [] disposable email blocking
-- [] rate limiting
-- [] failed login tracking
-- [] account lockout
 - [] Password Reset System
 - [] logout all sessions
 - [] view active sessions
 - [] Token Rotation
+
+

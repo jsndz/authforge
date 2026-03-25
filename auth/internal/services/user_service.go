@@ -120,9 +120,10 @@ func (s *UserService) Login(ctx context.Context, useremail, password, ip string)
 	s.ResetLoginAttempts(ctx, useremail, ip)
 
 	now := time.Now()
-	user.LastLoginAt = &now
 
-	err = s.userRepository.Update(user)
+	user, err = s.userRepository.Update(user.ID, map[string]interface{}{
+		"last_login_at": now,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -159,19 +160,26 @@ func (s *UserService) DeactivateUser(id uint) error {
 		return errors.New("user already deactivated")
 	}
 
-	user.IsActive = false
+	_, err = s.userRepository.Update(user.ID, map[string]interface{}{
+		"is_active":  false,
+		"updated_at": time.Now(),
+	})
 
-	return s.userRepository.Update(user)
+	return err
 }
 
-func (s *UserService) VerifyEmail(ctx context.Context, rawToken string, tokenType model.TokenType) (LoginResponse, error) {
+func (s *UserService) VerifyEmail(ctx context.Context, rawToken string) (LoginResponse, error) {
 
-	token, err := s.tokenService.VerifyToken(rawToken, tokenType)
+	token, err := s.tokenService.VerifyToken(rawToken, model.TokenEmailVerification)
 	if err != nil {
 		return LoginResponse{}, err
 	}
 
-	user, err := s.userRepository.UpdateVerification(true, token.UserID)
+	user, err := s.userRepository.Update(token.UserID, map[string]interface{}{
+		"email_verified": true,
+		"updated_at":     time.Now(),
+	})
+
 	if err != nil {
 		return LoginResponse{}, err
 	}
@@ -193,23 +201,39 @@ func (s *UserService) VerifyEmail(ctx context.Context, rawToken string, tokenTyp
 
 }
 
+func (s *UserService) VerifyPasswordReset(ctx context.Context, rawToken string, password string) error {
+	token, err := s.tokenService.VerifyToken(rawToken, model.TokenPasswordReset)
+	if err != nil {
+		return err
+	}
+	if err := security.PasswordStrengthValidation(password); err != nil {
+		return err
+	}
+	passwordHash, err := security.HashPassword(password, security.DefaultParams)
+	if err != nil {
+		return err
+	}
+	_, err = s.userRepository.Update(token.UserID, map[string]interface{}{
+		"password":   passwordHash,
+		"updated_at": time.Now(),
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *UserService) UpdateUsername(userID uint, username string) (*model.User, error) {
 	newUsername := strings.TrimSpace(username)
 	if newUsername == "" {
 		return nil, errors.New("username is required")
 	}
 
-	user, err := s.userRepository.FindByID(userID)
+	user, err := s.userRepository.Update(userID, map[string]interface{}{
+		"user_name":  newUsername,
+		"updated_at": time.Now(),
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	if user.UserName == newUsername {
-		return user, nil
-	}
-
-	user.UserName = newUsername
-	if err := s.userRepository.Update(user); err != nil {
 		return nil, err
 	}
 
@@ -267,4 +291,18 @@ func (s *UserService) RecordLoginFailure(ctx context.Context, email, ip string) 
 func (s *UserService) ResetLoginAttempts(ctx context.Context, email, ip string) {
 	s.redis.Del(ctx, "login:fail:user:"+email)
 	s.redis.Del(ctx, "login:fail:ip:"+ip)
+}
+
+func (s *UserService) RequestPasswordReset(ctx context.Context, email string) error {
+	user, err := s.userRepository.FindByEmail(email)
+	if err != nil {
+		return errors.New("if the email exists, a reset link will be sent")
+	}
+
+	token, err := s.tokenService.GetToken(user.ID, model.TokenPasswordReset)
+	if err != nil {
+		return err
+	}
+
+	return s.emailService.SendPasswordResetEmail(email, token)
 }

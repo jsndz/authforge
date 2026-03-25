@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jsndz/authforge/internal/model"
 	"github.com/jsndz/authforge/internal/services"
 )
 
@@ -31,6 +30,14 @@ type LoginRequest struct {
 
 type UpdateUsernameRequest struct {
 	Username string `json:"username" binding:"required"`
+}
+
+type ResetPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+type VerifyResetPasswordRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 func (h *UserHandler) Register(c *gin.Context) {
@@ -98,7 +105,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	user, err := h.UserService.VerifyEmail(c, token, model.TokenEmailVerification)
+	user, err := h.UserService.VerifyEmail(c, token)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -167,4 +174,39 @@ func (h *UserHandler) UpdateUsername(c *gin.Context) {
 		"username": updatedUser.UserName,
 		"email":    updatedUser.Email,
 	})
+}
+
+func (h *UserHandler) RequestPasswordReset(c *gin.Context) {
+	var req ResetPasswordRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.UserService.RequestPasswordReset(c, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "if email exists, password reset link has been sent"})
+}
+
+func (h *UserHandler) VerifyPasswordReset(c *gin.Context) {
+	var req VerifyResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err := h.UserService.VerifyPasswordReset(c, req.Token, req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password reset verified"})
 }

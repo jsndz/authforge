@@ -11,6 +11,7 @@ func AuthRouter(router *gin.RouterGroup, userHandler *handler.UserHandler, token
 	router.POST("/signup", userHandler.Register)
 	router.POST("/login", userHandler.Login)
 	router.GET("/email/verify", userHandler.VerifyEmail)
-	router.PATCH("/update-username", middleware.AuthenticateUser(jwtSecret), userHandler.UpdateUsername)
+	router.PATCH("/update/username", middleware.AuthenticateUser(jwtSecret), userHandler.UpdateUsername)
+	router.POST("/reset/password", userHandler.RequestPasswordReset)
 
 }

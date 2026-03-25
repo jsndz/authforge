@@ -1,0 +1,1 @@
+user will click -> reset password -> send mail with token ->  hit endpoint -> open link -> send new password with token -> verify token -> change password -> send 200 
