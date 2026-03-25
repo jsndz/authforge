@@ -155,7 +155,6 @@ func (s *UserService) DeactivateUser(id uint) error {
 	if err != nil {
 		return err
 	}
-
 	if !user.IsActive {
 		return errors.New("user already deactivated")
 	}
@@ -220,6 +219,7 @@ func (s *UserService) VerifyPasswordReset(ctx context.Context, rawToken string, 
 	if err != nil {
 		return err
 	}
+	s.sessionService.AllSessionLogout(ctx, token.UserID)
 	return nil
 }
 
@@ -305,4 +305,8 @@ func (s *UserService) RequestPasswordReset(ctx context.Context, email string) er
 	}
 
 	return s.emailService.SendPasswordResetEmail(email, token)
+}
+
+func (s *UserService) CompleteLogout(ctx context.Context, userId uint) error {
+	return s.sessionService.AllSessionLogout(ctx, userId)
 }

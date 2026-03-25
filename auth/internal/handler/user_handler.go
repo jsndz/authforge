@@ -210,3 +210,20 @@ func (h *UserHandler) VerifyPasswordReset(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "password reset verified"})
 }
+
+func (h *UserHandler) CompleteLogout(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	err := h.UserService.CompleteLogout(c, userID.(uint))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	c.JSON(http.StatusOK, gin.H{"message": "logged out from all sessions"})
+}

@@ -13,5 +13,6 @@ func AuthRouter(router *gin.RouterGroup, userHandler *handler.UserHandler, token
 	router.GET("/email/verify", userHandler.VerifyEmail)
 	router.PATCH("/update/username", middleware.AuthenticateUser(jwtSecret), userHandler.UpdateUsername)
 	router.POST("/reset/password", userHandler.RequestPasswordReset)
-
+	router.GET("/logout", middleware.AuthenticateUser(jwtSecret), userHandler.Logout)
+	router.GET("/logout/all", middleware.AuthenticateUser(jwtSecret), userHandler.CompleteLogout)
 }

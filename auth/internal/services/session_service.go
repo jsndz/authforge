@@ -35,6 +35,7 @@ func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (
 	}
 	hashedRefreshToken := util.HashTokenWithSha256(refreshToken)
 	s.redis.Set(ctx, fmt.Sprintf("refresh:%s", hashedRefreshToken), UserId, 7*24*time.Hour)
+	s.redis.SAdd(ctx, fmt.Sprintf("user_session:%d", UserId), hashedRefreshToken)
 	return accessToken, refreshToken, err
 }
 
@@ -58,5 +59,18 @@ func (s *SessionService) RevokeToken(ctx context.Context, token string) error {
 
 func (s *SessionService) BlacklistToken(ctx context.Context, token string, duration time.Duration) error {
 	s.redis.Set(ctx, fmt.Sprintf("blacklist:%s", token), "blacklisted", duration)
+	return nil
+}
+
+func (s *SessionService) AllSessionLogout(ctx context.Context, userID uint) error {
+	sessionKeys, err := s.redis.SMembers(ctx, fmt.Sprintf("user_session:%d", userID)).Result()
+	if err != nil {
+		return err
+	}
+
+	for _, key := range sessionKeys {
+		s.redis.Del(ctx, fmt.Sprintf("refresh:%s", key))
+	}
+	s.redis.Del(ctx, fmt.Sprintf("user_session:%d", userID))
 	return nil
 }
