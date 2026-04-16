@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { LogOut, LogOut as LogOutIcon, Settings, ChevronDown, User } from 'lucide-react';
+import { LogOut, Settings, ChevronDown, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export function AccountMenu() {
@@ -65,7 +65,7 @@ export function AccountMenu() {
               onClick={() => { setOpen(false); logoutAll(); }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
             >
-              <LogOutIcon className="h-4 w-4 text-red-400" />
+              <LogOut className="h-4 w-4 text-red-400" />
               Sign out all sessions
             </button>
           </div>

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jsndz/authforge/internal/security"
@@ -27,10 +28,12 @@ func NewSessionService(secret string, redisClient *redis.Client) *SessionService
 func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (string, string, error) {
 	accessToken, err := util.CreateJWT(UserId, 15*time.Minute, s.jwtSecret)
 	if err != nil {
+		log.Printf("Error creating access token: %v", err)
 		return "", "", err
 	}
 	refreshToken, err := security.GenerateToken()
 	if err != nil {
+		log.Printf("Error creating refresh token: %v", err)
 		return "", "", err
 	}
 	hashedRefreshToken := util.HashTokenWithSha256(refreshToken)
