@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 )
 
+// opaque token
 func GenerateToken() (string, error) {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)

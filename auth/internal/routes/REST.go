@@ -15,5 +15,5 @@ func AuthRouter(router *gin.RouterGroup, userHandler *handler.UserHandler, token
 	router.POST("/reset/password", userHandler.RequestPasswordReset)
 	router.GET("/logout", middleware.AuthenticateUser(jwtSecret), userHandler.Logout)
 	router.GET("/logout/all", middleware.AuthenticateUser(jwtSecret), userHandler.CompleteLogout)
-	router.POST("/auth/refresh", middleware.AuthenticateUser(jwtSecret), userHandler.RefreshToken)
+	router.POST("/refresh", middleware.AuthenticateUser(jwtSecret), userHandler.RefreshToken)
 }

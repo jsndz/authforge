@@ -1,5 +1,7 @@
 package email
 
+import "log"
+
 type EmailService struct {
 }
 
@@ -9,6 +11,7 @@ func NewEmailService() *EmailService {
 
 func (s *EmailService) SendEmailVerification(email, token string) error {
 	// Implementation for sending email verification
+	log.Printf("Sending email verification to %s with token %s", email, token)
 	return nil
 }
 

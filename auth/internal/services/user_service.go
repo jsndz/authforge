@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -171,22 +172,30 @@ func (s *UserService) VerifyEmail(ctx context.Context, rawToken string) (LoginRe
 
 	token, err := s.tokenService.VerifyToken(rawToken, model.TokenEmailVerification)
 	if err != nil {
+		log.Printf("Email verification failed: token verification error - %v", err)
 		return LoginResponse{}, err
 	}
+	log.Printf("Token verified for user ID: %d", token.UserID)
 
+	log.Printf("Updating user %d to mark email as verified", token.UserID)
 	user, err := s.userRepository.Update(token.UserID, map[string]interface{}{
 		"email_verified": true,
 		"updated_at":     time.Now(),
 	})
 
 	if err != nil {
+		log.Printf("Failed to update user %d: %v", token.UserID, err)
 		return LoginResponse{}, err
 	}
+	log.Printf("User %d email verified successfully", token.UserID)
 
+	log.Printf("Creating session tokens for user %d", token.UserID)
 	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(ctx, token.UserID)
 	if err != nil {
+		log.Printf("Failed to create session tokens for user %d: %v", token.UserID, err)
 		return LoginResponse{}, err
 	}
+	log.Printf("Session tokens created successfully for user %d", token.UserID)
 
 	return LoginResponse{
 		User: UserResponse{

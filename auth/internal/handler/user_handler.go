@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -104,7 +105,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		})
 		return
 	}
-
+	log.Println("token from handler: " + token)
 	user, err := h.UserService.VerifyEmail(c, token)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -112,7 +113,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		})
 		return
 	}
-
+	log.Println("user from handler: " + user.User.Username)
 	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
 	c.JSON(http.StatusCreated, gin.H{
 		"access_token": user.AccessToken,

@@ -1,69 +1,383 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
   title: AuthForge API
   description: API documentation for the AuthForge authentication service.
   version: 1.0.0
 servers:
-  - url: http://localhost:8080/api/v1/auth
+  - url: http://localhost:8080
 paths:
-  /signup:
+  /ping:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns a simple pong response.
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+
+  /api/v1/auth/signup:
     post:
-      summary: User Registration
-      description: Register a new user.
+      tags:
+        - Authentication
+      summary: Register a user
+      description: Creates a new user account and sends an email verification token.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                password:
-                  type: string
-              required:
-                - email
-                - password
+              $ref: '#/components/schemas/RegisterRequest'
       responses:
         '201':
           description: User registered successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
         '400':
-          description: Invalid input.
-  /login:
+          description: Invalid input or duplicate account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/login:
     post:
-      summary: User Login
-      description: Authenticate a user and return a token.
+      tags:
+        - Authentication
+      summary: Login
+      description: Authenticates a user and returns an access token. A refresh token is set in an HTTP-only cookie.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                password:
-                  type: string
-              required:
-                - email
-                - password
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        '200':
+        '201':
           description: Login successful.
-        '401':
-          description: Unauthorized.
-  /email/verify:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          description: Invalid credentials or blocked account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/email/verify:
     get:
-      summary: Verify Email
-      description: Verify a user's email address.
+      tags:
+        - Authentication
+      summary: Verify email
+      description: Verifies a user's email address using the one-time token sent by email. A refresh token is set in an HTTP-only cookie.
       parameters:
         - name: token
           in: query
           required: true
           schema:
             type: string
+          description: Email verification token.
+      responses:
+        '201':
+          description: Email verified successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          description: Missing or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Verification failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/update/username:
+    patch:
+      tags:
+        - Authentication
+      summary: Update username
+      description: Updates the authenticated user's username.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUsernameRequest'
       responses:
         '200':
-          description: Email verified successfully.
+          description: Username updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
         '400':
-          description: Invalid or expired token.
+          description: Invalid input.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/reset/password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: Sends a password reset token to the provided email address if the account exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset request processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid input.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to send reset email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/logout:
+    get:
+      tags:
+        - Authentication
+      summary: Logout current session
+      description: Revokes the current refresh token and blacklists the access token.
+      security:
+        - bearerAuth: []
+          refreshTokenCookie: []
+      responses:
+        '200':
+          description: Logged out successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing tokens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Logout failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/logout/all:
+    get:
+      tags:
+        - Authentication
+      summary: Logout all sessions
+      description: Revokes all active refresh tokens for the authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out from all sessions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Logout failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Rotates the refresh token cookie and returns a new access token.
+      security:
+        - bearerAuth: []
+          refreshTokenCookie: []
+      responses:
+        '200':
+          description: Access token refreshed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '400':
+          description: Missing refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Token refresh failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshTokenCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+  schemas:
+    PingResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: pong
+      required:
+        - message
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+      required:
+        - username
+        - email
+        - password
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+    UpdateUsernameRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+      required:
+        - username
+    ResetPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+        - id
+        - username
+        - email
+    SessionResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+        - access_token
+        - username
+        - email
+    RefreshResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+      required:
+        - access_token

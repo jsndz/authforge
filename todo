@@ -1,3 +1,160 @@
-- [] Token Rotation
 
 
+## 1. High-Impact Features (Do Next)
+
+**Multi-Factor Authentication (MFA)**
+
+* TOTP (Google Authenticator)
+* Backup codes
+* Optional MFA enforcement per user
+
+**Email Security Improvements**
+
+* Expiring verification links
+* Resend verification with rate limiting
+
+**Device / Session Management UI**
+
+* List active sessions (IP, device, last used)
+* Revoke specific session
+
+**Role-Based Access Control (RBAC)**
+
+* Roles table + permissions
+* Middleware for permission checks
+
+---
+
+## 2. Token & Session Hardening
+
+**JWT Improvements**
+
+* Add `aud`, `iss`, `sub` validation
+* Key rotation support (RS256 instead of HS256)
+
+**Refresh Token Enhancements**
+
+* Detect reuse (token theft detection)
+* Device-bound refresh tokens
+
+**Session Security**
+
+* Session expiry (idle + absolute timeout)
+* Detect suspicious login (new IP/device)
+
+---
+
+## 3. Security Protections (Critical)
+
+From your list :
+
+**CSRF Protection**
+
+* CSRF tokens for cookie-based auth
+
+**XSS Protection**
+
+* Sanitize inputs
+* Secure headers
+
+**Rate Limiting (Global)**
+
+* Per IP + per endpoint
+
+**CAPTCHA (optional)**
+
+* After repeated failures
+
+---
+
+## 4. Modern Authentication
+
+**Passwordless Auth**
+
+* Magic link login
+* Email OTP login
+
+**OAuth Login**
+
+* Google login
+* GitHub login
+
+---
+
+## 5. Advanced Auth Systems
+
+**OpenID Connect (OIDC)**
+
+* Issue ID tokens
+* JWKS endpoint
+
+**API Key System**
+
+* Generate + revoke API keys
+* Scope-based access
+
+**Service-to-Service Auth**
+
+* Internal JWT or mTLS
+
+---
+
+## 6. Observability & Production Readiness
+
+**Audit Logs**
+
+* Login, logout, password change, failures
+
+**Monitoring**
+
+* Track anomalies (multiple IPs, spikes)
+
+**Admin Controls**
+
+* Disable user
+* Force logout all sessions
+
+---
+
+## 7. Distributed / Scale Concepts
+
+**Key Rotation**
+
+* Rotate JWT signing keys
+
+**Multi-region readiness**
+
+* Redis replication strategy
+
+**Token Revocation Strategy**
+
+* Blacklist vs short expiry tradeoff
+
+---
+
+## 8. Optional (Very Advanced)
+
+**WebAuthn / Passkeys**
+
+* Biometric login
+
+**ABAC / Policy Engine**
+
+* Fine-grained permissions (OPA)
+
+---
+
+## Minimal Next Sprint Plan (Practical)
+
+Do in this order:
+
+1. MFA (TOTP)
+2. RBAC
+3. Session listing + revoke
+4. CSRF protection
+5. JWT RS256 + key rotation
+
+---
+
+If needed, next step can be:
+“implement MFA (TOTP) step-by-step in your Go project”.

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/jsndz/authforge/internal/model"
@@ -41,11 +42,14 @@ func (s *TokenService) GetToken(userID uint, tokenType model.TokenType) (string,
 }
 
 func (s *TokenService) VerifyToken(rawToken string, tokenType model.TokenType) (*model.Token, error) {
+	log.Printf("Verifying token: %s of type %v", rawToken, tokenType)
 	hashedToken := util.HashTokenWithSha256(rawToken)
+	log.Printf("Hashed token: %s", hashedToken)
 	token, err := s.TokenRepository.GetOnHash(hashedToken, tokenType)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("Retrieved token: %v", token)
 	if token.ExpiresAt < time.Now().Unix() {
 		return nil, errors.New("token expired")
 	}
