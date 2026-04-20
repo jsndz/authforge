@@ -1,160 +1,156 @@
+## 6. OAuth2 + OIDC (add to AuthForge)
 
+### Step 1 — DB models
 
-## 1. High-Impact Features (Do Next)
-
-**Multi-Factor Authentication (MFA)**
-
-* TOTP (Google Authenticator)
-* Backup codes
-* Optional MFA enforcement per user
-
-**Email Security Improvements**
-
-* Expiring verification links
-* Resend verification with rate limiting
-
-**Device / Session Management UI**
-
-* List active sessions (IP, device, last used)
-* Revoke specific session
-
-**Role-Based Access Control (RBAC)**
-
-* Roles table + permissions
-* Middleware for permission checks
+* `clients`: id, secret, redirect_uri, scopes
+* `auth_codes`: code, user_id, client_id, code_challenge, expiry
 
 ---
 
-## 2. Token & Session Hardening
+### Step 2 — `/oauth/authorize`
 
-**JWT Improvements**
-
-* Add `aud`, `iss`, `sub` validation
-* Key rotation support (RS256 instead of HS256)
-
-**Refresh Token Enhancements**
-
-* Detect reuse (token theft detection)
-* Device-bound refresh tokens
-
-**Session Security**
-
-* Session expiry (idle + absolute timeout)
-* Detect suspicious login (new IP/device)
+* Validate client + redirect_uri
+* Require logged-in user
+* Accept: `scope`, `state`, `code_challenge`
+* Create auth_code (TTL ~5 min)
+* Redirect with `code`
 
 ---
 
-## 3. Security Protections (Critical)
+### Step 3 — `/oauth/token`
 
-From your list :
+* Accept: code, client_id, code_verifier
+* Verify:
 
-**CSRF Protection**
+  * code exists + not used
+  * PKCE: `SHA256(verifier) == challenge`
+* Issue:
 
-* CSRF tokens for cookie-based auth
-
-**XSS Protection**
-
-* Sanitize inputs
-* Secure headers
-
-**Rate Limiting (Global)**
-
-* Per IP + per endpoint
-
-**CAPTCHA (optional)**
-
-* After repeated failures
+  * access_token (JWT)
+  * refresh_token (reuse your flow)
+  * id_token (new)
 
 ---
 
-## 4. Modern Authentication
+### Step 4 — ID Token (OIDC)
 
-**Passwordless Auth**
+JWT claims:
 
-* Magic link login
-* Email OTP login
-
-**OAuth Login**
-
-* Google login
-* GitHub login
+* sub (user_id)
+* email
+* aud (client_id)
+* iss, exp
 
 ---
 
-## 5. Advanced Auth Systems
+### Step 5 — Scopes
 
-**OpenID Connect (OIDC)**
+* Store in auth_code + client
+* Add to JWT:
 
-* Issue ID tokens
-* JWKS endpoint
+```json
+"scope": "read write"
+```
 
-**API Key System**
+* Middleware:
 
-* Generate + revoke API keys
-* Scope-based access
-
-**Service-to-Service Auth**
-
-* Internal JWT or mTLS
+  * check required scope per route
 
 ---
 
-## 6. Observability & Production Readiness
+### Step 6 — Roles
 
-**Audit Logs**
+* Add `role` to user table
+* Add to JWT:
 
-* Login, logout, password change, failures
-
-**Monitoring**
-
-* Track anomalies (multiple IPs, spikes)
-
-**Admin Controls**
-
-* Disable user
-* Force logout all sessions
+```json
+"role": "admin"
+```
 
 ---
 
-## 7. Distributed / Scale Concepts
+## 7. Authorization (RBAC)
 
-**Key Rotation**
+### Step 1 — Define roles
 
-* Rotate JWT signing keys
+* user, admin
 
-**Multi-region readiness**
+### Step 2 — Middleware
 
-* Redis replication strategy
+* Extract role from JWT
+* Enforce:
 
-**Token Revocation Strategy**
+```go
+if role != "admin" { deny }
+```
 
-* Blacklist vs short expiry tradeoff
+### Step 3 — Optional
 
----
-
-## 8. Optional (Very Advanced)
-
-**WebAuthn / Passkeys**
-
-* Biometric login
-
-**ABAC / Policy Engine**
-
-* Fine-grained permissions (OPA)
+* Map roles → permissions (read, write)
 
 ---
 
-## Minimal Next Sprint Plan (Practical)
+## 8. Attacks (protect system)
 
-Do in this order:
+### CSRF
 
-1. MFA (TOTP)
-2. RBAC
-3. Session listing + revoke
-4. CSRF protection
-5. JWT RS256 + key rotation
+* Use SameSite=Strict cookies
+* Add CSRF token for state-changing APIs
+
+### XSS
+
+* Never store tokens in localStorage
+* Use HttpOnly cookies
+* Escape outputs
+
+### Brute force
+
+* Already done (Redis counters)
+* Add IP + email rate limit
+
+### Token theft
+
+* Short-lived access tokens (5–15 min)
+* Refresh rotation (already done)
+* Bind session to IP/device (optional)
 
 ---
 
-If needed, next step can be:
-“implement MFA (TOTP) step-by-step in your Go project”.
+## 9. System Design
+
+### Stateless vs Stateful
+
+* Access token → stateless (JWT)
+* Refresh token → stateful (Redis)
+  → keep this hybrid (correct design)
+
+---
+
+### Token Revocation
+
+* Access token:
+
+  * blacklist in Redis (you have this)
+* Refresh token:
+
+  * delete from Redis
+
+---
+
+### Key Rotation
+
+* Maintain multiple JWT secrets:
+
+```id="1"
+kid: key-id
+```
+
+* Sign with current key
+* Verify using all active keys
+* Rotate periodically
+
+---
+
+
+
+6. OAuth2 + OIDC Auth Code + PKCE Tokens, scopes, roles 7. Authorization RBAC 8. Attacks CSRF, XSS, brute force, token theft 9. System Design Stateless vs stateful auth Token revocation Key rotation

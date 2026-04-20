@@ -12,22 +12,27 @@ import (
 type AppContainer struct {
 	UserHandler  *handler.UserHandler
 	TokenHandler *handler.TokenHandler
+	OauthHandler *handler.OauthHandler
 }
 
 func InitApp(db *gorm.DB, redis *redis.Client, jwtSecret string) *AppContainer {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewTokenRepository(db)
+	oauthRepo := repository.NewOauthRepo(db)
 
 	tokenService := services.NewTokenService(tokenRepo)
 	sessionService := services.NewSessionService(jwtSecret, redis)
 	emailService := email.NewEmailService()
 	userService := services.NewUserService(userRepo, tokenService, sessionService, emailService, redis)
+	oauthService := services.NewOAuthService(oauthRepo)
 
 	userHandler := handler.NewUserHandler(userService)
 	tokenHandler := handler.NewTokenHandler(tokenService)
+	oauthHandler := handler.NewOauthHandler(oauthService)
 
 	return &AppContainer{
 		UserHandler:  userHandler,
 		TokenHandler: tokenHandler,
+		OauthHandler: oauthHandler,
 	}
 }
