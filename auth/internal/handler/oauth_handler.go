@@ -26,7 +26,7 @@ func (h *OauthHandler) Authorize(c *gin.Context) {
 	clientID := c.Query("client_id")
 	redirectUri := c.Query("redirect_uri")
 	scopes := c.Query("scopes")
-
+	state := c.Query("state")
 	sessionId, err := c.Cookie("session_id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session token"})
@@ -37,7 +37,7 @@ func (h *OauthHandler) Authorize(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(302, redirectUri+"?code="+authCode)
+	c.Redirect(302, redirectUri+"?code="+authCode+"&state="+state)
 }
 
 func (h *OauthHandler) Token(c *gin.Context) {
