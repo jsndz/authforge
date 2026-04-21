@@ -2,7 +2,8 @@ package model
 
 type OauthClient struct {
 	ID          uint   `gorm:"primaryKey"`
-	ClientId    uint   `gorm:"not null"`
+	ClientID    string `gorm:"unique;not null"`
+	Secret      string
 	RedirectUri string `gorm:"not null"`
 	Scopes      string `gorm:"not null"`
 }

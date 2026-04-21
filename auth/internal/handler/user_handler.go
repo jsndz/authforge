@@ -90,10 +90,13 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
+	c.SetCookie("session_id", user.SessionId, 7*24*3600, "/", "", true, true)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"access_token": user.AccessToken,
 		"username":     user.User.Username,
 		"email":        user.User.Email,
+		"session_id":   user.SessionId,
 	})
 }
 
@@ -115,6 +118,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	}
 	log.Println("user from handler: " + user.User.Username)
 	c.SetCookie("refresh_token", user.RefreshToken, 7*24*3600, "/", "", true, true)
+	c.SetCookie("session_id", user.SessionId, 7*24*3600, "/", "", true, true)
 	c.JSON(http.StatusCreated, gin.H{
 		"access_token": user.AccessToken,
 		"username":     user.User.Username,
@@ -127,6 +131,7 @@ func (h *UserHandler) Logout(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refresh_token")
 	accessToken := c.GetHeader("Authorization")
 	accessToken = accessToken[len("Bearer "):]
+	sessionId, _ := c.Cookie("session_id")
 
 	if refreshToken == "" || accessToken == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -134,13 +139,14 @@ func (h *UserHandler) Logout(c *gin.Context) {
 		})
 		return
 	}
-	err := h.UserService.Logout(c, refreshToken, accessToken)
+	err := h.UserService.Logout(c, refreshToken, accessToken, sessionId)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	c.SetCookie("session_id", "", -1, "/", "", true, true)
 
 	c.JSON(200, gin.H{"message": "logged out"})
 }
@@ -226,6 +232,7 @@ func (h *UserHandler) CompleteLogout(c *gin.Context) {
 	}
 
 	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	c.SetCookie("session_id", "", -1, "/", "", true, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out from all sessions"})
 }
 
@@ -237,12 +244,14 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, err := h.UserService.RefreshToken(c, refreshToken)
+	accessToken, refreshToken, sessionId, err := h.UserService.RefreshToken(c, refreshToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", "", true, true)
+	c.SetCookie("session_id", sessionId, 7*24*3600, "/", "", true, true)
+
 	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
 }

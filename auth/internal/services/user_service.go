@@ -32,6 +32,7 @@ type LoginResponse struct {
 	User         UserResponse `json:"user"`
 	AccessToken  string       `json:"access_token"`
 	RefreshToken string       `json:"refresh_token"`
+	SessionId    string       `json:"session_id"`
 }
 
 func NewUserService(
@@ -129,7 +130,7 @@ func (s *UserService) Login(ctx context.Context, useremail, password, ip string)
 		return nil, err
 	}
 
-	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(ctx, user.ID)
+	accessToken, refreshToken, sessionId, err := s.sessionService.CreateSessionTokens(ctx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +143,13 @@ func (s *UserService) Login(ctx context.Context, useremail, password, ip string)
 		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		SessionId:    sessionId,
 	}, nil
 }
 
-func (s *UserService) Logout(ctx context.Context, RefreshToken string, accessToken string) error {
+func (s *UserService) Logout(ctx context.Context, RefreshToken string, accessToken string, sessionId string) error {
 	s.sessionService.BlacklistToken(ctx, accessToken, 15*time.Minute)
+	s.sessionService.RevokeSession(ctx, sessionId)
 	return s.sessionService.RevokeToken(ctx, RefreshToken)
 }
 
@@ -190,7 +193,7 @@ func (s *UserService) VerifyEmail(ctx context.Context, rawToken string) (LoginRe
 	log.Printf("User %d email verified successfully", token.UserID)
 
 	log.Printf("Creating session tokens for user %d", token.UserID)
-	accessToken, refreshToken, err := s.sessionService.CreateSessionTokens(ctx, token.UserID)
+	accessToken, refreshToken, sessionId, err := s.sessionService.CreateSessionTokens(ctx, token.UserID)
 	if err != nil {
 		log.Printf("Failed to create session tokens for user %d: %v", token.UserID, err)
 		return LoginResponse{}, err
@@ -205,8 +208,8 @@ func (s *UserService) VerifyEmail(ctx context.Context, rawToken string) (LoginRe
 		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		SessionId:    sessionId,
 	}, nil
-
 }
 
 func (s *UserService) VerifyPasswordReset(ctx context.Context, rawToken string, password string) error {
@@ -320,16 +323,16 @@ func (s *UserService) CompleteLogout(ctx context.Context, userId uint) error {
 	return s.sessionService.AllSessionLogout(ctx, userId)
 }
 
-func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (string, string, string, error) {
 	userId, err := s.sessionService.ValidateRefreshToken(ctx, refreshToken)
 	if err != nil {
 		s.sessionService.AllSessionLogout(ctx, userId)
-		return "", "", errors.New("invalid refresh token")
+		return "", "", "", errors.New("invalid refresh token")
 	}
 
 	err = s.sessionService.DeleteToken(ctx, refreshToken)
 	if err != nil {
-		return "", "", errors.New("failed to delete refresh token")
+		return "", "", "", errors.New("failed to delete refresh token")
 	}
 	return s.sessionService.CreateSessionTokens(ctx, userId)
 }

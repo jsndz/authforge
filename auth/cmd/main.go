@@ -39,6 +39,6 @@ func main() {
 	})
 	app := bootstrap.InitApp(database, redis, cfg.JWTSecret)
 	api := router.Group("/api/v1/auth")
-	routes.AuthRouter(api, app.UserHandler, app.TokenHandler, cfg.JWTSecret)
+	routes.AuthRouter(api, app.UserHandler, app.TokenHandler, app.OauthHandler, cfg.JWTSecret)
 	router.Run()
 }

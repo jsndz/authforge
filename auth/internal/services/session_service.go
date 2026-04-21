@@ -25,21 +25,23 @@ func NewSessionService(secret string, redisClient *redis.Client) *SessionService
 	}
 }
 
-func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (string, string, error) {
+func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (string, string, string, error) {
 	accessToken, err := util.CreateJWT(UserId, 15*time.Minute, s.jwtSecret)
 	if err != nil {
 		log.Printf("Error creating access token: %v", err)
-		return "", "", err
+		return "", "", "", err
 	}
 	refreshToken, err := security.GenerateToken()
 	if err != nil {
 		log.Printf("Error creating refresh token: %v", err)
-		return "", "", err
+		return "", "", "", err
 	}
+	session_id := security.GenerateSessionId()
 	hashedRefreshToken := util.HashTokenWithSha256(refreshToken)
 	s.redis.Set(ctx, fmt.Sprintf("refresh:%s", hashedRefreshToken), UserId, 7*24*time.Hour)
 	s.redis.SAdd(ctx, fmt.Sprintf("user_session:%d", UserId), hashedRefreshToken)
-	return accessToken, refreshToken, err
+	s.redis.Set(ctx, fmt.Sprintf("session:%s", session_id), UserId, 7*24*time.Hour)
+	return accessToken, refreshToken, session_id, err
 }
 
 func (s *SessionService) ValidateRefreshToken(ctx context.Context, refreshToken string) (uint, error) {
@@ -57,12 +59,30 @@ func (s *SessionService) ValidateRefreshToken(ctx context.Context, refreshToken 
 
 	return uint(userID), nil
 }
+func (s *SessionService) ValidateSession(ctx context.Context, sessionId string) (uint, error) {
+	if sessionId == "" {
+		return 0, fmt.Errorf("missing session")
+	}
 
+	userID, err := s.redis.Get(ctx, "session:"+sessionId).Uint64()
+	if err == redis.Nil {
+		return 0, fmt.Errorf("invalid session")
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return uint(userID), nil
+}
 func (s *SessionService) RevokeToken(ctx context.Context, token string) error {
 	s.redis.Del(ctx, fmt.Sprintf("refresh:%s", token))
 	return nil
 }
 
+func (s *SessionService) RevokeSession(ctx context.Context, sessionId string) error {
+	s.redis.Del(ctx, fmt.Sprintf("session:%s", sessionId))
+	return nil
+}
 func (s *SessionService) BlacklistToken(ctx context.Context, token string, duration time.Duration) error {
 	s.redis.Set(ctx, fmt.Sprintf("blacklist:%s", token), "blacklisted", duration)
 	return nil

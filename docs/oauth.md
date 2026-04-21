@@ -124,3 +124,19 @@ which app can access what
 ```
 
 ---
+
+
+
+Now Regular flow exist but with that also there is oauth flow which can be used for external API or multi-client 
+
+there are 2 api's
+/ oauth/authorize
+
+where you pass the session id get verified and Server generates authorization code
+and you get redirected to client page with code where the  code get send to 
+ /oauth/token
+
+ where it is verified and it provides tokens for the external API system
+
+
+ this is basic setup

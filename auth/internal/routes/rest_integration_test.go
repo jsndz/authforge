@@ -58,7 +58,7 @@ func setupTestApp(t *testing.T) *testApp {
 	app := bootstrap.InitApp(gormDB, redisClient, testJWTSecret)
 	router := gin.New()
 	api := router.Group("/api/v1/auth")
-	routes.AuthRouter(api, app.UserHandler, app.TokenHandler, testJWTSecret)
+	routes.AuthRouter(api, app.UserHandler, app.TokenHandler, app.OauthHandler, testJWTSecret)
 
 	tokenRepo := repository.NewTokenRepository(gormDB)
 	tokenService := services.NewTokenService(tokenRepo)
@@ -248,15 +248,15 @@ func TestAuthLogoutEndpoint(t *testing.T) {
 	user := createUser(t, tApp.gormDB, "logout_user", "logout@example.com", "Str0ng@Pass", true)
 
 	ctx := context.Background()
-	accessToken, refreshToken, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID)
+	accessToken, refreshToken, sessionId, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("failed to create session tokens: %v", err)
 	}
 
 	headers := map[string]string{"Authorization": "Bearer " + accessToken}
 	cookie := &http.Cookie{Name: "refresh_token", Value: refreshToken}
-
-	resp := performJSONRequest(t, tApp.router, http.MethodGet, "/api/v1/auth/logout", nil, headers, cookie)
+	session_cookie := &http.Cookie{Name: "session_id", Value: sessionId}
+	resp := performJSONRequest(t, tApp.router, http.MethodGet, "/api/v1/auth/logout", nil, headers, cookie, session_cookie)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected %d got %d: %s", http.StatusOK, resp.Code, resp.Body.String())
 	}
@@ -283,15 +283,16 @@ func TestAuthRefreshEndpoint(t *testing.T) {
 	user := createUser(t, tApp.gormDB, "refresh_user", "refresh@example.com", "Str0ng@Pass", true)
 
 	ctx := context.Background()
-	accessToken, refreshToken, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID)
+	accessToken, refreshToken, sessionId, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("failed to create session tokens: %v", err)
 	}
 
 	headers := map[string]string{"Authorization": "Bearer " + accessToken}
 	cookie := &http.Cookie{Name: "refresh_token", Value: refreshToken}
+	session_cookie := &http.Cookie{Name: "session_id", Value: sessionId}
 
-	resp := performJSONRequest(t, tApp.router, http.MethodPost, "/api/v1/auth/refresh", nil, headers, cookie)
+	resp := performJSONRequest(t, tApp.router, http.MethodPost, "/api/v1/auth/refresh", nil, headers, cookie, session_cookie)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected %d got %d: %s", http.StatusOK, resp.Code, resp.Body.String())
 	}
