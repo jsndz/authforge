@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jsndz/authforge/internal/services"
@@ -12,8 +13,11 @@ type OauthHandler struct {
 }
 
 type TokenRequest struct {
-	ClientId string `json:"client_id" binding:"required"`
-	Code     string `json:"code" binding:"required"`
+	ClientId     string `form:"client_id" binding:"required"`
+	Code         string `form:"code" binding:"required"`
+	CodeVerifier string `form:"code_verifier" binding:"required"`
+	RedirectUri  string `form:"redirect_uri" binding:"required"`
+	GrantType    string `form:"grant_type" binding:"required"`
 }
 
 func NewOauthHandler(OauthService *services.OauthService) *OauthHandler {
@@ -27,29 +31,46 @@ func (h *OauthHandler) Authorize(c *gin.Context) {
 	redirectUri := c.Query("redirect_uri")
 	scopes := c.Query("scopes")
 	state := c.Query("state")
+	if state == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "state_required"})
+		return
+	}
 	sessionId, err := c.Cookie("session_id")
+	code_challenge := c.Query("code_challenge")
+	code_challenge_method := c.Query("code_challenge_method")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session token"})
 		return
 	}
-	authCode, err := h.oauthService.AuthorizeClient(c, clientID, sessionId, redirectUri, scopes)
+
+	authCode, err := h.oauthService.AuthorizeClient(c, clientID, sessionId, redirectUri, scopes, code_challenge, code_challenge_method)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(302, redirectUri+"?code="+authCode+"&state="+state)
+	u, _ := url.Parse(redirectUri)
+	q := u.Query()
+	q.Set("code", authCode)
+	q.Set("state", state)
+	u.RawQuery = q.Encode()
+
+	c.Redirect(302, u.String())
 }
 
 func (h *OauthHandler) Token(c *gin.Context) {
 	var req TokenRequest
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
-	access_token, refresh_token, session_id, err := h.oauthService.Token(c, req.ClientId, req.Code)
+	if req.GrantType != "authorization_code" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported_grant_type"})
+		return
+	}
+	access_token, refresh_token, session_id, err := h.oauthService.Token(c, req.ClientId, req.Code, req.RedirectUri, req.CodeVerifier)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{

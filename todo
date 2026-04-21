@@ -154,3 +154,128 @@ kid: key-id
 
 
 6. OAuth2 + OIDC Auth Code + PKCE Tokens, scopes, roles 7. Authorization RBAC 8. Attacks CSRF, XSS, brute force, token theft 9. System Design Stateless vs stateful auth Token revocation Key rotation
+
+
+
+
+
+
+**PKCE (Proof Key for Code Exchange)** prevents authorization code interception.
+
+---
+
+### Problem without PKCE
+
+1. Client starts login → gets `code`
+2. That `code` travels via browser (redirect)
+3. Attacker (malicious app, proxy, injected script) steals the `code`
+4. Attacker calls `/token` with that `code`
+5. Gets access token → account compromise
+
+**Key issue:**
+Authorization server cannot verify *who originally requested the code*
+
+---
+
+### PKCE solution
+
+Adds a **one-time secret proof** tied to the code.
+
+---
+
+### Step-by-step flow
+
+**1. Client generates verifier**
+
+* Random string: `code_verifier`
+
+**2. Client derives challenge**
+
+* `code_challenge = SHA256(code_verifier)` (base64url encoded)
+
+---
+
+**3. Authorization request**
+
+```
+/oauth/authorize?
+  client_id=...
+  &code_challenge=abc123
+  &code_challenge_method=S256
+```
+
+Server:
+
+* Stores `code_challenge` with the auth code
+
+---
+
+**4. Token request**
+
+```
+/oauth/token
+  code=...
+  code_verifier=original_random_string
+```
+
+Server:
+
+* Recomputes SHA256(verifier)
+* Compares with stored `code_challenge`
+
+---
+
+### Why this works
+
+* Attacker may steal `code`
+* But **cannot guess `code_verifier`**
+* Token exchange fails
+
+---
+
+### What to implement
+
+**In `/authorize`**
+
+* Accept:
+
+  * `code_challenge`
+  * `code_challenge_method`
+* Store with auth code
+
+**In `/token`**
+
+* Require:
+
+  * `code_verifier`
+* Validate:
+
+  ```
+  hash(code_verifier) == stored code_challenge
+  ```
+
+---
+
+### Security impact
+
+* Protects against:
+
+  * Code interception
+  * Malicious apps on same device
+  * Network-level attackers
+
+* Mandatory for:
+
+  * Mobile apps
+  * SPAs
+  * Public clients (no client secret)
+
+---
+
+### Summary
+
+Without PKCE:
+→ Anyone with `code` can get tokens
+
+With PKCE:
+→ Only the original requester can exchange the code
