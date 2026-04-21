@@ -210,7 +210,7 @@ func TestAuthUpdateUsernameEndpoint(t *testing.T) {
 	tApp := setupTestApp(t)
 	user := createUser(t, tApp.gormDB, "update_user", "update@example.com", "Str0ng@Pass", true)
 
-	accessToken, err := util.CreateJWT(user.ID, 15*time.Minute, testJWTSecret)
+	accessToken, err := util.CreateJWT(user.ID, "read write", 15*time.Minute, testJWTSecret)
 	if err != nil {
 		t.Fatalf("failed to create access token: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestAuthLogoutEndpoint(t *testing.T) {
 	user := createUser(t, tApp.gormDB, "logout_user", "logout@example.com", "Str0ng@Pass", true)
 
 	ctx := context.Background()
-	accessToken, refreshToken, sessionId, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID)
+	accessToken, refreshToken, sessionId, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID, "read write")
 	if err != nil {
 		t.Fatalf("failed to create session tokens: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestAuthCompleteLogoutEndpoint(t *testing.T) {
 	tApp := setupTestApp(t)
 	user := createUser(t, tApp.gormDB, "logout_all_user", "logoutall@example.com", "Str0ng@Pass", true)
 
-	accessToken, err := util.CreateJWT(user.ID, 15*time.Minute, testJWTSecret)
+	accessToken, err := util.CreateJWT(user.ID, "read write", 15*time.Minute, testJWTSecret)
 	if err != nil {
 		t.Fatalf("failed to create access token: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestAuthRefreshEndpoint(t *testing.T) {
 	user := createUser(t, tApp.gormDB, "refresh_user", "refresh@example.com", "Str0ng@Pass", true)
 
 	ctx := context.Background()
-	accessToken, refreshToken, sessionId, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID)
+	accessToken, refreshToken, sessionId, err := tApp.sessionService.CreateSessionTokens(ctx, user.ID, "read write")
 	if err != nil {
 		t.Fatalf("failed to create session tokens: %v", err)
 	}

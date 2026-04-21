@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jsndz/authforge/internal/repository"
@@ -51,7 +52,11 @@ func (s *OauthService) AuthorizeClient(ctx context.Context, clientId, sessionId,
 	if client.RedirectUri != redirectUri {
 		return "", fmt.Errorf("invalid redirect URI")
 	}
-
+	allowedScope := strings.Split(client.Scopes, " ")
+	requestedScope := strings.Split(scope, " ")
+	if !isSubset(requestedScope, allowedScope) {
+		return "", fmt.Errorf("scope not permitted")
+	}
 	authCode, err := security.GenerateAuthCode()
 	if err != nil {
 		return "", err
@@ -107,10 +112,23 @@ func (s *OauthService) Token(ctx context.Context, clientId, code, redirectUri, c
 		return "", "", "", err
 	}
 
-	access_token, refresh_token, session_id, err := s.sessionService.CreateSessionTokens(ctx, user.UserID)
+	access_token, refresh_token, session_id, err := s.sessionService.CreateSessionTokens(ctx, user.UserID, user.Scope)
 	if err != nil {
 		return "", "", "", err
 	}
 
 	return access_token, refresh_token, session_id, nil
+}
+
+func isSubset(requested, allowed []string) bool {
+	m := make(map[string]bool)
+	for _, s := range allowed {
+		m[s] = true
+	}
+	for _, s := range requested {
+		if !m[s] {
+			return false
+		}
+	}
+	return true
 }

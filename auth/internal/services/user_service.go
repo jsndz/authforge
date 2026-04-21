@@ -130,7 +130,7 @@ func (s *UserService) Login(ctx context.Context, useremail, password, ip string)
 		return nil, err
 	}
 
-	accessToken, refreshToken, sessionId, err := s.sessionService.CreateSessionTokens(ctx, user.ID)
+	accessToken, refreshToken, sessionId, err := s.sessionService.CreateSessionTokens(ctx, user.ID, "read write")
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (s *UserService) VerifyEmail(ctx context.Context, rawToken string) (LoginRe
 	log.Printf("User %d email verified successfully", token.UserID)
 
 	log.Printf("Creating session tokens for user %d", token.UserID)
-	accessToken, refreshToken, sessionId, err := s.sessionService.CreateSessionTokens(ctx, token.UserID)
+	accessToken, refreshToken, sessionId, err := s.sessionService.CreateSessionTokens(ctx, token.UserID, "read write")
 	if err != nil {
 		log.Printf("Failed to create session tokens for user %d: %v", token.UserID, err)
 		return LoginResponse{}, err
@@ -334,5 +334,5 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (st
 	if err != nil {
 		return "", "", "", errors.New("failed to delete refresh token")
 	}
-	return s.sessionService.CreateSessionTokens(ctx, userId)
+	return s.sessionService.CreateSessionTokens(ctx, userId, "read write")
 }

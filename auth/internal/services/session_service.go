@@ -25,8 +25,8 @@ func NewSessionService(secret string, redisClient *redis.Client) *SessionService
 	}
 }
 
-func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint) (string, string, string, error) {
-	accessToken, err := util.CreateJWT(UserId, 15*time.Minute, s.jwtSecret)
+func (s *SessionService) CreateSessionTokens(ctx context.Context, UserId uint, scope string) (string, string, string, error) {
+	accessToken, err := util.CreateJWT(UserId, scope, 15*time.Minute, s.jwtSecret)
 	if err != nil {
 		log.Printf("Error creating access token: %v", err)
 		return "", "", "", err

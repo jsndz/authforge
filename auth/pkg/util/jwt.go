@@ -6,9 +6,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func CreateJWT(userID uint, period time.Duration, secretKey string) (string, error) {
+func CreateJWT(userID uint, scope string, period time.Duration, secretKey string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
+		"scope":   scope,
 		"exp":     time.Now().Add(period).Unix(),
 		"iat":     time.Now().Unix(),
 	}
