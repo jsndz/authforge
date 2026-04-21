@@ -70,7 +70,7 @@ func (h *OauthHandler) Token(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported_grant_type"})
 		return
 	}
-	access_token, refresh_token, session_id, err := h.oauthService.Token(c, req.ClientId, req.Code, req.RedirectUri, req.CodeVerifier)
+	access_token, refresh_token, session_id, id_token, err := h.oauthService.Token(c, req.ClientId, req.Code, req.RedirectUri, req.CodeVerifier)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -83,5 +83,8 @@ func (h *OauthHandler) Token(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"access_token": access_token,
+		"id_token":     id_token,
+		"token_type":   "Bearer",
+		"expires_in":   900,
 	})
 }

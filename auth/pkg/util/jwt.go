@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -39,4 +40,23 @@ func ValidateJWT(tokenString string, secretKey string) (uint, error) {
 	}
 
 	return 0, jwt.ErrInvalidKey
+}
+
+func CreateIDToken(userID uint, email, clientID, secret string) (string, error) {
+	claims := jwt.MapClaims{
+		"sub": fmt.Sprintf("%d", userID),
+
+		"email":     email,
+		"client_id": clientID,
+		"exp":       time.Now().Add(15 * time.Minute).Unix(),
+		"iat":       time.Now().Unix(),
+		"iss":       "authforge",
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }

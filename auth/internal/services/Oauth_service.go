@@ -10,13 +10,16 @@ import (
 
 	"github.com/jsndz/authforge/internal/repository"
 	"github.com/jsndz/authforge/internal/security"
+	"github.com/jsndz/authforge/pkg/util"
 	"github.com/redis/go-redis/v9"
 )
 
 type OauthService struct {
 	oauthRepo      *repository.OauthRepo
 	sessionService *SessionService
+	UserService    *UserService
 	redis          *redis.Client
+	jwtSecret      string
 }
 
 type OAuthUser struct {
@@ -26,13 +29,16 @@ type OAuthUser struct {
 	CodeChallenge       string
 	CodeChallengeMethod string
 	RedirectUri         string
+	Email               string
 }
 
-func NewOAuthService(oauthRepo *repository.OauthRepo, sessionService *SessionService, redis *redis.Client) *OauthService {
+func NewOAuthService(oauthRepo *repository.OauthRepo, sessionService *SessionService, userService *UserService, redis *redis.Client, jwtSecret string) *OauthService {
 	return &OauthService{
 		redis:          redis,
 		oauthRepo:      oauthRepo,
 		sessionService: sessionService,
+		UserService:    userService,
+		jwtSecret:      jwtSecret,
 	}
 }
 
@@ -61,7 +67,10 @@ func (s *OauthService) AuthorizeClient(ctx context.Context, clientId, sessionId,
 	if err != nil {
 		return "", err
 	}
-
+	user, err := s.UserService.GetUserByID(userId)
+	if err != nil {
+		return "", err
+	}
 	oauthUser := &OAuthUser{
 		UserID:              userId,
 		ClientId:            clientId,
@@ -69,6 +78,7 @@ func (s *OauthService) AuthorizeClient(ctx context.Context, clientId, sessionId,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 		RedirectUri:         redirectUri,
+		Email:               user.Email,
 	}
 	data, err := json.Marshal(oauthUser)
 	if err != nil {
@@ -82,42 +92,49 @@ func (s *OauthService) AuthorizeClient(ctx context.Context, clientId, sessionId,
 	return authCode, nil
 }
 
-func (s *OauthService) Token(ctx context.Context, clientId, code, redirectUri, codeVerifier string) (string, string, string, error) {
+func (s *OauthService) Token(ctx context.Context, clientId, code, redirectUri, codeVerifier string) (string, string, string, string, error) {
 	var user OAuthUser
 	val, err := s.redis.Get(ctx, code).Result()
 	if err == redis.Nil {
-		return "", "", "", errors.New("invalid_or_expired_code")
+		return "", "", "", "", errors.New("invalid_or_expired_code")
 	}
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	err = json.Unmarshal([]byte(val), &user)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	if user.ClientId != clientId {
-		return "", "", "", errors.New("invalid_client")
+		return "", "", "", "", errors.New("invalid_client")
 	}
 	if user.RedirectUri != redirectUri {
-		return "", "", "", errors.New("invalid_redirect_uri")
+		return "", "", "", "", errors.New("invalid_redirect_uri")
 	}
 	if user.CodeChallenge == "" || codeVerifier == "" {
-		return "", "", "", errors.New("pkce_required")
+		return "", "", "", "", errors.New("pkce_required")
 	}
 	err = security.VerifyCodeChallenge(codeVerifier, user.CodeChallenge, user.CodeChallengeMethod)
 	if err != nil {
-		return "", "", "", errors.New("invalid_code_verifier")
+		return "", "", "", "", errors.New("invalid_code_verifier")
 	}
 	if err := s.redis.Del(ctx, code).Err(); err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
 	access_token, refresh_token, session_id, err := s.sessionService.CreateSessionTokens(ctx, user.UserID, user.Scope)
+	IDtoken := ""
+	if strings.Contains(user.Scope, "openid") {
+		IDtoken, err = util.CreateIDToken(user.UserID, user.Email, user.ClientId, s.jwtSecret)
+		if err != nil {
+			return "", "", "", "", err
+		}
+	}
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
-	return access_token, refresh_token, session_id, nil
+	return access_token, refresh_token, session_id, IDtoken, nil
 }
 
 func isSubset(requested, allowed []string) bool {

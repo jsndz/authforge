@@ -24,7 +24,7 @@ func InitApp(db *gorm.DB, redis *redis.Client, jwtSecret string) *AppContainer {
 	sessionService := services.NewSessionService(jwtSecret, redis)
 	emailService := email.NewEmailService()
 	userService := services.NewUserService(userRepo, tokenService, sessionService, emailService, redis)
-	oauthService := services.NewOAuthService(oauthRepo, sessionService, redis)
+	oauthService := services.NewOAuthService(oauthRepo, sessionService, userService, redis, jwtSecret)
 
 	userHandler := handler.NewUserHandler(userService)
 	tokenHandler := handler.NewTokenHandler(tokenService)

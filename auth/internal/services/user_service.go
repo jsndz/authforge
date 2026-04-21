@@ -336,3 +336,7 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (st
 	}
 	return s.sessionService.CreateSessionTokens(ctx, userId, "read write")
 }
+
+func (s *UserService) GetUserByID(userID uint) (*model.User, error) {
+	return s.userRepository.FindByID(userID)
+}
