@@ -340,3 +340,22 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (st
 func (s *UserService) GetUserByID(userID uint) (*model.User, error) {
 	return s.userRepository.FindByID(userID)
 }
+
+func (s *UserService) GetUserByEmail(email string) (*model.User, error) {
+	return s.userRepository.FindByEmail(email)
+}
+func (s *UserService) CreateGoogleUser(email string) (*model.User, error) {
+	user := &model.User{
+		Email:         email,
+		UserName:      email,
+		IsActive:      true,
+		EmailVerified: true,
+	}
+
+	err := s.userRepository.Create(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}

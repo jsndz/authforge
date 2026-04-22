@@ -37,7 +37,7 @@ func main() {
 			"message": "pong",
 		})
 	})
-	app := bootstrap.InitApp(database, redis, cfg.JWTSecret)
+	app := bootstrap.InitApp(database, redis, cfg.JWTSecret, cfg.GOOGLE_CLIENT_ID, cfg.GOOGLE_CALLBACK_URL, cfg.GOOGLE_CLIENT_SECRET)
 	api := router.Group("/api/v1/auth")
 	routes.AuthRouter(api, app.UserHandler, app.TokenHandler, app.OauthHandler, cfg.JWTSecret)
 	router.Run()

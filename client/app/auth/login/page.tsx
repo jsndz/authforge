@@ -7,7 +7,13 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Eye, EyeOff, LogIn, Loader as Loader2 } from 'lucide-react';
+import {
+  clearGoogleLoginContext,
+  createPkcePair,
+  createRandomState,
+  saveGoogleLoginContext,
+} from '@/lib/auth/google-login';
+import { Chrome, Eye, EyeOff, LogIn, Loader as Loader2 } from 'lucide-react';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -22,6 +28,7 @@ export default function LoginPage() {
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const {
     register,
@@ -36,6 +43,47 @@ export default function LoginPage() {
       router.replace('/account/username');
     } else {
       setServerError(result.error);
+    }
+  }
+
+  async function onGoogleLogin() {
+    setServerError(null);
+
+    const clientId = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID;
+    if (!clientId) {
+      setServerError('Google login is not configured. Missing NEXT_PUBLIC_OAUTH_CLIENT_ID.');
+      return;
+    }
+
+    setIsGoogleLoading(true);
+
+    try {
+      const redirectUri = `${window.location.origin}/auth/google/callback`;
+      const initialState = createRandomState();
+      const pkceState = createRandomState();
+      const pkce = await createPkcePair();
+
+      clearGoogleLoginContext();
+      saveGoogleLoginContext({
+        clientId,
+        redirectUri,
+        initialState,
+        pkceState,
+        pkceVerifier: pkce.verifier,
+        pkceChallenge: pkce.challenge,
+        createdAt: Date.now(),
+      });
+
+      const search = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        state: initialState,
+      });
+
+      window.location.assign(`/api/auth/auth/google?${search.toString()}`);
+    } catch {
+      setServerError('Failed to start Google login. Please try again.');
+      setIsGoogleLoading(false);
     }
   }
 
@@ -118,11 +166,21 @@ export default function LoginPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isGoogleLoading}
             className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Signing in...' : 'Sign in'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onGoogleLogin}
+            disabled={isSubmitting || isGoogleLoading}
+            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900/10 disabled:cursor-not-allowed disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+          >
+            {isGoogleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Chrome className="h-4 w-4" />}
+            {isGoogleLoading ? 'Redirecting to Google...' : 'Continue with Google'}
           </button>
         </form>
 

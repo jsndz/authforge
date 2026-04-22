@@ -8,8 +8,11 @@ import (
 )
 
 type Config struct {
-	DBConnectURL string
-	JWTSecret    string
+	DBConnectURL         string
+	JWTSecret            string
+	GOOGLE_CLIENT_ID     string
+	GOOGLE_CLIENT_SECRET string
+	GOOGLE_CALLBACK_URL  string
 }
 
 func Load() *Config {
@@ -19,7 +22,10 @@ func Load() *Config {
 	}
 
 	return &Config{
-		JWTSecret:    os.Getenv("JWT_SECRET"),
-		DBConnectURL: os.Getenv("DB_CONNECT_URL"),
+		JWTSecret:            os.Getenv("JWT_SECRET"),
+		DBConnectURL:         os.Getenv("DB_CONNECT_URL"),
+		GOOGLE_CLIENT_ID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		GOOGLE_CLIENT_SECRET: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GOOGLE_CALLBACK_URL:  os.Getenv("GOOGLE_CALLBACK_URL"),
 	}
 }

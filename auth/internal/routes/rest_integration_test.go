@@ -55,7 +55,7 @@ func setupTestApp(t *testing.T) *testApp {
 
 	redisClient := redis.NewClient(&redis.Options{Addr: mini.Addr()})
 
-	app := bootstrap.InitApp(gormDB, redisClient, testJWTSecret)
+	app := bootstrap.InitApp(gormDB, redisClient, testJWTSecret, "", "", "")
 	router := gin.New()
 	api := router.Group("/api/v1/auth")
 	routes.AuthRouter(api, app.UserHandler, app.TokenHandler, app.OauthHandler, testJWTSecret)

@@ -15,7 +15,7 @@ type AppContainer struct {
 	OauthHandler *handler.OauthHandler
 }
 
-func InitApp(db *gorm.DB, redis *redis.Client, jwtSecret string) *AppContainer {
+func InitApp(db *gorm.DB, redis *redis.Client, jwtSecret string, GOOGLE_CLIENT_ID string, GOOGLE_CALLBACK_URL string, GOOGLE_CLIENT_SECRET string) *AppContainer {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewTokenRepository(db)
 	oauthRepo := repository.NewOauthRepo(db)
@@ -24,7 +24,7 @@ func InitApp(db *gorm.DB, redis *redis.Client, jwtSecret string) *AppContainer {
 	sessionService := services.NewSessionService(jwtSecret, redis)
 	emailService := email.NewEmailService()
 	userService := services.NewUserService(userRepo, tokenService, sessionService, emailService, redis)
-	oauthService := services.NewOAuthService(oauthRepo, sessionService, userService, redis, jwtSecret)
+	oauthService := services.NewOAuthService(oauthRepo, sessionService, userService, redis, jwtSecret, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL)
 
 	userHandler := handler.NewUserHandler(userService)
 	tokenHandler := handler.NewTokenHandler(tokenService)

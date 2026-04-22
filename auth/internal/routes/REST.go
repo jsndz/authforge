@@ -18,4 +18,7 @@ func AuthRouter(router *gin.RouterGroup, userHandler *handler.UserHandler, token
 	router.POST("/refresh", middleware.AuthenticateUser(jwtSecret), userHandler.RefreshToken)
 	router.GET("/oauth/authorize", oauthHandler.Authorize)
 	router.POST("/oauth/token", oauthHandler.Token)
+
+	router.GET("/google", oauthHandler.OauthclientLogin)
+	router.GET("/google/callback", oauthHandler.GoogleCallback)
 }

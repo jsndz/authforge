@@ -36,6 +36,8 @@ AuthForge is a comprehensive authentication and authorization service built with
 - OpenID Connect (OIDC) ID token generation
 - Support for `openid` scope to retrieve user identity
 - Session-based authorization with secure session cookies
+- Google OAuth login bootstrap endpoint for OAuth clients
+- Google OAuth callback flow that creates/finds a user and continues local OAuth flow
 
 ### Infrastructure & Monitoring
 - Health check endpoint (`/ping`)
@@ -97,6 +99,8 @@ Base path: `/api/v1/auth`
 **OAuth2.0 Endpoints:**
 - `GET /oauth/authorize` - OAuth authorization endpoint (requires user authentication)
 - `POST /oauth/token` - OAuth token endpoint (exchange authorization code for tokens)
+- `GET /auth/google` - Start Google OAuth login for a client (`client_id`, `redirect_uri`, `state`)
+- `GET /auth/google/callback` - Google callback; sets session cookies and redirects with local authorization code
 
 ### Health Check
 - `GET /ping` - Service health check
@@ -119,6 +123,9 @@ The application reads environment variables. A `.env` file can be used to config
 ### Required Environment Variables
 - `DB_CONNECT_URL` - PostgreSQL connection string
 - `JWT_SECRET` - Secret key for signing JWT tokens
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID used for social login
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret used in callback token exchange
+- `GOOGLE_CALLBACK_URL` - Callback URL registered in Google Console
 
 ### Optional Configuration
 - CORS allowed origins and methods
@@ -153,6 +160,7 @@ docs/                          # API and feature documentation
 ## Notes
 
 - Refresh tokens are stored in secure, HTTP-only cookies
+- `session_id` is stored as an HTTP-only cookie and is used to validate OAuth authorization sessions
 - Login attempts are tracked separately by email address and IP address
 - Active sessions are grouped per user in Redis for efficient session management
 - Authorization codes expire after 5 minutes

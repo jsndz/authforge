@@ -34,6 +34,20 @@ import {
   verifyEmailApi,
 } from '@/lib/auth/api';
 
+function decodeJwtPayload<T>(token: string): T | null {
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Context shape ────────────────────────────────────────────────────────────
 
 interface AuthContextValue {
@@ -215,9 +229,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const oauthToken = useCallback(
     async (payload: OAuthTokenRequest): Promise<ApiResult<OAuthTokenResponse>> => {
-      return toResult(() => oauthTokenMutation.mutateAsync(payload));
+      const result = await toResult(() => oauthTokenMutation.mutateAsync(payload));
+
+      if (result.ok) {
+        type IdTokenClaims = { email?: string };
+        const claims = result.data.id_token ? decodeJwtPayload<IdTokenClaims>(result.data.id_token) : null;
+        const email = claims?.email;
+
+        if (email) {
+          const fallbackUsername = email.includes('@') ? email.split('@')[0] : email;
+          applySession(result.data.access_token, {
+            email,
+            username: fallbackUsername,
+          });
+        }
+      }
+
+      return result;
     },
-    [oauthTokenMutation, toResult]
+    [applySession, oauthTokenMutation, toResult]
   );
 
   const logout = useCallback(async () => {

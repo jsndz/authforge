@@ -88,3 +88,41 @@ func (h *OauthHandler) Token(c *gin.Context) {
 		"expires_in":   900,
 	})
 }
+
+func (h *OauthHandler) OauthclientLogin(c *gin.Context) {
+	redirectUri := c.Query("redirect_uri")
+	clientId := c.Query("client_id")
+	if redirectUri == "" || clientId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "redirect_uri_and_client_id_required"})
+		return
+	}
+	state := c.Query("state")
+	if state == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "state_required"})
+		return
+	}
+	url, err := h.oauthService.Oauthlogin(redirectUri, clientId, state)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Redirect(302, url)
+}
+func (h *OauthHandler) GoogleCallback(c *gin.Context) {
+	code := c.Query("code")
+	state := c.Query("state")
+
+	redirectURL, _, refresh, session, err :=
+		h.oauthService.HandleGoogleCallback(c, code, state)
+
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("session_id", session, 7*24*3600, "/", "", true, true)
+	c.SetCookie("refresh_token", refresh, 7*24*3600, "/", "", true, true)
+
+	c.Redirect(302, redirectURL)
+}

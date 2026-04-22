@@ -24,6 +24,8 @@ tags:
     description: User authentication endpoints
   - name: OAuth2.0
     description: OAuth2.0 authorization and token endpoints
+  - name: Social Login
+    description: Third-party social authentication endpoints
   - name: User Management
     description: User profile management endpoints
 
@@ -161,7 +163,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResponse'
         '400':
-          description: Missing or invalid verification token.
+          description: Missing verification token.
           content:
             application/json:
               schema:
@@ -169,10 +171,13 @@ paths:
               examples:
                 missing_token:
                   value:
-                    error: Verification token required
-                expired_token:
-                  value:
-                    error: Verification token has expired
+                    error: token is required
+        '500':
+          description: Token verification failed or verification could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/auth/update/username:
     patch:
@@ -344,7 +349,7 @@ paths:
             Set-Cookie:
               schema:
                 type: string
-                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
+                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict; session_id=abc123...; Path=/; HttpOnly; Secure; SameSite=Strict
           content:
             application/json:
               schema:
@@ -378,6 +383,8 @@ paths:
         Initiates OAuth2.0 authorization code flow. User must be authenticated (session_id cookie required).
         Returns authorization code via redirect to the provided redirect_uri.
         Supports PKCE (Proof Key for Code Exchange) for enhanced security.
+      security:
+        - cookieSessionId: []
       parameters:
         - name: client_id
           in: query
@@ -447,10 +454,10 @@ paths:
                     error: state_required
                 invalid_client:
                   value:
-                    error: invalid_client
+                    error: invalid client_id
                 invalid_scope:
                   value:
-                    error: scope_not_permitted
+                    error: scope not permitted
 
   /api/v1/auth/oauth/token:
     post:
@@ -459,7 +466,8 @@ paths:
         - OAuth2.0
       summary: OAuth token endpoint
       description: >
-        Exchanges an authorization code for access token, refresh token, and optionally ID token.
+        Exchanges an authorization code for access token and optionally ID token.
+        Refresh token and session identifier are set as HTTP-only secure cookies.
         Uses PKCE verification to ensure code has not been intercepted.
         Must use application/x-www-form-urlencoded content type.
       requestBody:
@@ -479,13 +487,13 @@ paths:
       responses:
         '201':
           description: >
-            Token exchange successful. Returns access token, refresh token, and optionally ID token.
-            Refresh token is also set as an HTTP-only secure cookie.
+            Token exchange successful. Returns access token and optionally ID token.
+            Refresh token and session_id are set as HTTP-only secure cookies.
           headers:
             Set-Cookie:
               schema:
                 type: string
-                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
+                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict; session_id=abc123...; Path=/; HttpOnly; Secure; SameSite=Strict
           content:
             application/json:
               schema:
@@ -507,6 +515,105 @@ paths:
                   value:
                     error: unsupported_grant_type
 
+  /api/v1/auth/auth/google:
+    get:
+      operationId: googleOauthLogin
+      tags:
+        - Social Login
+      summary: Start Google OAuth login
+      description: >
+        Starts Google OAuth login flow for an OAuth client.
+        Validates client_id and redirect_uri against registered OAuth client metadata,
+        then redirects to Google's authorization endpoint.
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth client identifier.
+          example: myapp_client_123
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Redirect URI registered for the client. Must match exactly.
+          example: https://app.example.com/callback
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Opaque state value to prevent CSRF attacks.
+          example: state123xyz
+      responses:
+        '302':
+          description: Redirects to Google OAuth consent screen.
+          headers:
+            Location:
+              schema:
+                type: string
+                example: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&state=...
+        '400':
+          description: Missing required query parameters or invalid OAuth client/redirect URI.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthErrorResponse'
+              examples:
+                missing_params:
+                  value:
+                    error: redirect_uri_and_client_id_required
+                missing_state:
+                  value:
+                    error: state_required
+                invalid_redirect:
+                  value:
+                    error: invalid_redirect_uri
+
+  /api/v1/auth/auth/google/callback:
+    get:
+      operationId: googleOauthCallback
+      tags:
+        - Social Login
+      summary: Google OAuth callback
+      description: >
+        Handles Google callback, creates or finds user by email, issues local session tokens,
+        and redirects to the client redirect_uri with authorization code and original state.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from Google.
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Encoded state returned by Google.
+      responses:
+        '302':
+          description: Redirects to client redirect URI with AuthForge authorization code and state.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: session_id=abc123...; Path=/; HttpOnly; Secure; SameSite=Strict; refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
+            Location:
+              schema:
+                type: string
+                example: https://app.example.com/callback?code=auth_code_123&state=state123xyz
+        '400':
+          description: Google callback processing failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -519,6 +626,11 @@ components:
       in: cookie
       name: refresh_token
       description: HTTP-only secure cookie containing the refresh token
+    cookieSessionId:
+      type: apiKey
+      in: cookie
+      name: session_id
+      description: HTTP-only secure cookie containing the session identifier
   schemas:
     PingResponse:
       type: object
@@ -547,18 +659,7 @@ components:
       properties:
         error:
           type: string
-          description: OAuth error code
-          enum:
-            - invalid_request
-            - invalid_client
-            - invalid_grant
-            - unauthorized_client
-            - unsupported_grant_type
-            - invalid_scope
-            - state_required
-            - invalid_or_expired_code
-            - invalid_code_verifier
-            - pkce_required
+          description: OAuth error message
           example: invalid_or_expired_code
       required:
         - error
