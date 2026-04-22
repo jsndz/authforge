@@ -1,17 +1,40 @@
 openapi: 3.0.3
 info:
   title: AuthForge API
-  description: API documentation for the AuthForge authentication service.
+  description: >
+    AuthForge is a comprehensive authentication and authorization service providing
+    OAuth2.0, OpenID Connect (OIDC), and traditional JWT-based authentication with
+    PKCE support for secure multi-client applications.
   version: 1.0.0
+  contact:
+    name: AuthForge Support
+  license:
+    name: MIT
+
 servers:
   - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.authforge.example.com
+    description: Production server
+
+tags:
+  - name: Health
+    description: Service health checks
+  - name: Authentication
+    description: User authentication endpoints
+  - name: OAuth2.0
+    description: OAuth2.0 authorization and token endpoints
+  - name: User Management
+    description: User profile management endpoints
+
 paths:
   /ping:
     get:
+      operationId: healthCheck
       tags:
         - Health
       summary: Health check
-      description: Returns a simple pong response.
+      description: Returns a simple pong response to verify service is running.
       responses:
         '200':
           description: Service is healthy.
@@ -22,95 +45,142 @@ paths:
 
   /api/v1/auth/signup:
     post:
+      operationId: registerUser
       tags:
         - Authentication
-      summary: Register a user
-      description: Creates a new user account and sends an email verification token.
+      summary: Register a new user
+      description: >
+        Creates a new user account with provided credentials. A verification email
+        with a one-time token is sent to the provided email address.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              example1:
+                value:
+                  username: johndoe
+                  email: john@example.com
+                  password: SecurePass123!
       responses:
         '201':
-          description: User registered successfully.
+          description: User registered successfully. Email verification email has been sent.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
         '400':
-          description: Invalid input or duplicate account.
+          description: Invalid input or account already exists.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                duplicate_email:
+                  value:
+                    error: Email already registered
+                invalid_password:
+                  value:
+                    error: Password does not meet complexity requirements
 
   /api/v1/auth/login:
     post:
+      operationId: loginUser
       tags:
         - Authentication
-      summary: Login
-      description: Authenticates a user and returns an access token. A refresh token is set in an HTTP-only cookie.
+      summary: Authenticate user
+      description: >
+        Authenticates a user with email and password. Returns a JWT access token
+        and sets a refresh token as an HTTP-only secure cookie.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
+            examples:
+              example1:
+                value:
+                  email: john@example.com
+                  password: SecurePass123!
       responses:
         '201':
-          description: Login successful.
+          description: Login successful. Refresh token set in secure HTTP-only cookie.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionResponse'
         '400':
-          description: Invalid credentials or blocked account.
+          description: Invalid credentials or user account blocked.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_credentials:
+                  value:
+                    error: Invalid email or password
+                account_blocked:
+                  value:
+                    error: Account temporarily blocked due to multiple failed login attempts
 
   /api/v1/auth/email/verify:
     get:
+      operationId: verifyEmail
       tags:
         - Authentication
-      summary: Verify email
-      description: Verifies a user's email address using the one-time token sent by email. A refresh token is set in an HTTP-only cookie.
+      summary: Verify email address
+      description: >
+        Verifies a user's email address using the one-time token sent via email after signup.
+        Upon successful verification, returns access token and sets refresh token cookie.
       parameters:
         - name: token
           in: query
           required: true
           schema:
             type: string
-          description: Email verification token.
+          description: One-time email verification token.
+          example: abc123def456...
       responses:
         '201':
-          description: Email verified successfully.
+          description: Email verified successfully. Access and refresh tokens issued.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionResponse'
         '400':
-          description: Missing or invalid token.
+          description: Missing or invalid verification token.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Verification failed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_token:
+                  value:
+                    error: Verification token required
+                expired_token:
+                  value:
+                    error: Verification token has expired
 
   /api/v1/auth/update/username:
     patch:
+      operationId: updateUsername
       tags:
-        - Authentication
+        - User Management
       summary: Update username
-      description: Updates the authenticated user's username.
+      description: Updates the authenticated user's username to a new unique value.
       security:
         - bearerAuth: []
       requestBody:
@@ -119,6 +189,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateUsernameRequest'
+            examples:
+              example1:
+                value:
+                  username: johndoe_new
       responses:
         '200':
           description: Username updated successfully.
@@ -127,13 +201,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserResponse'
         '400':
-          description: Invalid input.
+          description: Invalid input or username already taken.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized.
+          description: Unauthorized. Valid access token required.
           content:
             application/json:
               schema:
@@ -141,23 +215,34 @@ paths:
 
   /api/v1/auth/reset/password:
     post:
+      operationId: requestPasswordReset
       tags:
         - Authentication
       summary: Request password reset
-      description: Sends a password reset token to the provided email address if the account exists.
+      description: >
+        Sends a password reset email with a one-time token to the provided email address.
+        Returns success regardless of whether the account exists (for security).
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ResetPasswordRequest'
+            examples:
+              example1:
+                value:
+                  email: john@example.com
       responses:
         '200':
-          description: Password reset request processed.
+          description: Password reset request processed. If account exists, reset email has been sent.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+              examples:
+                success:
+                  value:
+                    message: If the email is associated with an account, a reset link will be sent.
         '400':
           description: Invalid input.
           content:
@@ -173,34 +258,37 @@ paths:
 
   /api/v1/auth/logout:
     get:
+      operationId: logout
       tags:
         - Authentication
       summary: Logout current session
-      description: Revokes the current refresh token and blacklists the access token.
+      description: >
+        Revokes the current refresh token and blacklists the access token.
+        User must be authenticated and provide refresh token cookie.
       security:
         - bearerAuth: []
-          refreshTokenCookie: []
+          cookieRefreshToken: []
       responses:
         '200':
-          description: Logged out successfully.
+          description: Successfully logged out from current session.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
         '400':
-          description: Missing tokens.
+          description: Missing required tokens.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized.
+          description: Unauthorized or invalid tokens.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Logout failed.
+          description: Logout operation failed.
           content:
             application/json:
               schema:
@@ -208,15 +296,18 @@ paths:
 
   /api/v1/auth/logout/all:
     get:
+      operationId: logoutAll
       tags:
         - Authentication
-      summary: Logout all sessions
-      description: Revokes all active refresh tokens for the authenticated user.
+      summary: Logout from all sessions
+      description: >
+        Revokes all active refresh tokens and blacklists all access tokens for the authenticated user.
+        Effectively logs out from all devices/sessions.
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Logged out from all sessions.
+          description: Successfully logged out from all sessions.
           content:
             application/json:
               schema:
@@ -228,7 +319,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Logout failed.
+          description: Logout operation failed.
           content:
             application/json:
               schema:
@@ -236,16 +327,24 @@ paths:
 
   /api/v1/auth/refresh:
     post:
+      operationId: refreshToken
       tags:
         - Authentication
       summary: Refresh access token
-      description: Rotates the refresh token cookie and returns a new access token.
+      description: >
+        Exchanges a refresh token for a new access token. Refresh token is rotated on each refresh
+        and a new token is set in the response cookie. Requires both access token and refresh token cookie.
       security:
         - bearerAuth: []
-          refreshTokenCookie: []
+          cookieRefreshToken: []
       responses:
         '200':
-          description: Access token refreshed successfully.
+          description: Access token refreshed successfully. New refresh token set in cookie.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
           content:
             application/json:
               schema:
@@ -257,17 +356,156 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized.
+          description: Unauthorized or invalid tokens.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Token refresh failed.
+          description: Token refresh operation failed.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/oauth/authorize:
+    get:
+      operationId: oauthAuthorize
+      tags:
+        - OAuth2.0
+      summary: OAuth authorization endpoint
+      description: >
+        Initiates OAuth2.0 authorization code flow. User must be authenticated (session_id cookie required).
+        Returns authorization code via redirect to the provided redirect_uri.
+        Supports PKCE (Proof Key for Code Exchange) for enhanced security.
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth client identifier.
+          example: myapp_client_123
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Redirect URI registered for the client. Must match exactly.
+          example: https://app.example.com/callback
+        - name: scopes
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Space-separated list of requested scopes. Common scopes include `openid`, `profile`, `email`.
+          example: openid profile email
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Opaque state value to prevent CSRF attacks. Must be returned with authorization code.
+          example: state123xyz
+        - name: code_challenge
+          in: query
+          required: true
+          schema:
+            type: string
+          description: PKCE code challenge derived from code_verifier.
+          example: E9Mrozoa2owUednMF2p_nc8Ygk1FRd-_KfIHwILvzqM
+        - name: code_challenge_method
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - S256
+              - plain
+          description: PKCE code challenge method. S256 (SHA256) is recommended.
+          example: S256
+      responses:
+        '302':
+          description: >
+            Authorization successful. Redirects to redirect_uri with authorization code and state.
+            Response includes redirect with parameters: ?code=...&state=...
+          headers:
+            Location:
+              schema:
+                type: string
+                example: https://app.example.com/callback?code=auth_code_123&state=state123xyz
+        '400':
+          description: Missing required parameters or invalid client/scope/redirect_uri.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthErrorResponse'
+              examples:
+                missing_state:
+                  value:
+                    error: state_required
+                invalid_client:
+                  value:
+                    error: invalid_client
+                invalid_scope:
+                  value:
+                    error: scope_not_permitted
+
+  /api/v1/auth/oauth/token:
+    post:
+      operationId: oauthToken
+      tags:
+        - OAuth2.0
+      summary: OAuth token endpoint
+      description: >
+        Exchanges an authorization code for access token, refresh token, and optionally ID token.
+        Uses PKCE verification to ensure code has not been intercepted.
+        Must use application/x-www-form-urlencoded content type.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+            examples:
+              example1:
+                value:
+                  grant_type: authorization_code
+                  client_id: myapp_client_123
+                  code: auth_code_123
+                  redirect_uri: https://app.example.com/callback
+                  code_verifier: AbCdEf123456789_123456789_123456789_12
+      responses:
+        '201':
+          description: >
+            Token exchange successful. Returns access token, refresh token, and optionally ID token.
+            Refresh token is also set as an HTTP-only secure cookie.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: refresh_token=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Invalid authorization code, code_verifier, or client credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthErrorResponse'
+              examples:
+                invalid_code:
+                  value:
+                    error: invalid_or_expired_code
+                invalid_verifier:
+                  value:
+                    error: invalid_code_verifier
+                unsupported_grant:
+                  value:
+                    error: unsupported_grant_type
 
 components:
   securitySchemes:
@@ -275,109 +513,244 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-    refreshTokenCookie:
+      description: JWT access token in Authorization header. Format - "Authorization: Bearer {token}"
+    cookieRefreshToken:
       type: apiKey
       in: cookie
       name: refresh_token
+      description: HTTP-only secure cookie containing the refresh token
   schemas:
     PingResponse:
       type: object
+      description: Health check response
       properties:
         message:
           type: string
           example: pong
       required:
         - message
+
     ErrorResponse:
       type: object
+      description: Standard error response
       properties:
         error:
           type: string
+          description: Error message describing what went wrong
+          example: Invalid credentials
       required:
         - error
+
+    OAuthErrorResponse:
+      type: object
+      description: OAuth error response
+      properties:
+        error:
+          type: string
+          description: OAuth error code
+          enum:
+            - invalid_request
+            - invalid_client
+            - invalid_grant
+            - unauthorized_client
+            - unsupported_grant_type
+            - invalid_scope
+            - state_required
+            - invalid_or_expired_code
+            - invalid_code_verifier
+            - pkce_required
+          example: invalid_or_expired_code
+      required:
+        - error
+
     MessageResponse:
       type: object
+      description: Standard success message response
       properties:
         message:
           type: string
+          example: Operation completed successfully
       required:
         - message
+
     RegisterRequest:
       type: object
+      description: User registration request
       properties:
         username:
           type: string
           minLength: 1
+          description: Unique username for the account
+          example: johndoe
         email:
           type: string
           format: email
+          description: Email address (must be unique and valid)
+          example: john@example.com
         password:
           type: string
           minLength: 6
+          description: Password (minimum 6 characters, should include uppercase, lowercase, numbers, and symbols)
+          example: SecurePass123!
       required:
         - username
         - email
         - password
+
     LoginRequest:
       type: object
+      description: User login request
       properties:
         email:
           type: string
           format: email
+          description: User's email address
+          example: john@example.com
         password:
           type: string
+          description: User's password
+          example: SecurePass123!
       required:
         - email
         - password
+
     UpdateUsernameRequest:
       type: object
+      description: Update username request
       properties:
         username:
           type: string
           minLength: 1
+          description: New unique username
+          example: johndoe_new
       required:
         - username
+
     ResetPasswordRequest:
       type: object
+      description: Password reset request
       properties:
         email:
           type: string
           format: email
+          description: Email address associated with the account
+          example: john@example.com
       required:
         - email
+
+    TokenRequest:
+      type: object
+      description: OAuth token exchange request (form-urlencoded)
+      properties:
+        grant_type:
+          type: string
+          enum:
+            - authorization_code
+          description: OAuth grant type (only authorization_code supported)
+          example: authorization_code
+        client_id:
+          type: string
+          description: OAuth client identifier
+          example: myapp_client_123
+        code:
+          type: string
+          description: Authorization code obtained from /oauth/authorize
+          example: auth_code_123
+        redirect_uri:
+          type: string
+          format: uri
+          description: Redirect URI (must match the one used in authorization request)
+          example: https://app.example.com/callback
+        code_verifier:
+          type: string
+          description: PKCE code verifier (must derive to the code_challenge from authorize request)
+          example: AbCdEf123456789_123456789_123456789_12
+      required:
+        - grant_type
+        - client_id
+        - code
+        - redirect_uri
+        - code_verifier
+
     UserResponse:
       type: object
+      description: User information response
       properties:
         id:
           type: integer
           format: int64
+          description: User's unique identifier
+          example: 1
         username:
           type: string
+          description: User's username
+          example: johndoe
         email:
           type: string
           format: email
+          description: User's email address
+          example: john@example.com
       required:
         - id
         - username
         - email
+
     SessionResponse:
       type: object
+      description: Session response with tokens after successful authentication
       properties:
         access_token:
           type: string
+          description: JWT access token for API requests
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         username:
           type: string
+          description: User's username
+          example: johndoe
         email:
           type: string
           format: email
+          description: User's email address
+          example: john@example.com
       required:
         - access_token
         - username
         - email
+
     RefreshResponse:
       type: object
+      description: Token refresh response
       properties:
         access_token:
           type: string
+          description: New JWT access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
       required:
         - access_token
+
+    TokenResponse:
+      type: object
+      description: OAuth token response
+      properties:
+        access_token:
+          type: string
+          description: JWT access token for API requests
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        id_token:
+          type: string
+          description: OpenID Connect ID token (only if openid scope was requested)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          enum:
+            - Bearer
+          description: Token type for authorization header
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Access token expiration time in seconds
+          example: 900
+      required:
+        - access_token
+        - token_type
+        - expires_in

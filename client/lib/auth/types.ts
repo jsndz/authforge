@@ -3,13 +3,6 @@ export interface User {
   email: string;
 }
 
-export interface AuthState {
-  user: User | null;
-  accessToken: string | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-}
-
 export interface LoginResponse {
   access_token: string;
   username: string;
@@ -32,6 +25,32 @@ export interface RefreshResponse {
   access_token: string;
 }
 
+export type CodeChallengeMethod = 'S256' | 'plain';
+
+export interface OAuthAuthorizeRequest {
+  client_id: string;
+  redirect_uri: string;
+  state: string;
+  code_challenge: string;
+  code_challenge_method: CodeChallengeMethod;
+  scopes?: string;
+}
+
+export interface OAuthTokenRequest {
+  grant_type: 'authorization_code';
+  client_id: string;
+  code: string;
+  redirect_uri: string;
+  code_verifier: string;
+}
+
+export interface OAuthTokenResponse {
+  access_token: string;
+  id_token?: string;
+  token_type: 'Bearer';
+  expires_in: number;
+}
+
 export interface UpdateUsernameResponse {
   id: number;
   username: string;
@@ -40,10 +59,6 @@ export interface UpdateUsernameResponse {
 
 export interface MessageResponse {
   message: string;
-}
-
-export interface ApiErrorResponse {
-  error: string;
 }
 
 export type ApiResult<T> =

@@ -1,3 +1,5 @@
+import { User } from '@/lib/auth/types';
+
 const TOKEN_KEY = 'auth_access_token';
 const USER_KEY = 'auth_user';
 
@@ -30,7 +32,7 @@ export const tokenStore = {
     }
   },
 
-  getUserFromStorage(): { username: string; email: string } | null {
+  getUserFromStorage(): User | null {
     const ss = safeSessionStorage();
     if (!ss) return null;
     const raw = ss.getItem(USER_KEY);
@@ -42,7 +44,7 @@ export const tokenStore = {
     }
   },
 
-  setUser(user: { username: string; email: string } | null): void {
+  setUser(user: User | null): void {
     const ss = safeSessionStorage();
     if (!ss) return;
     if (user) {
@@ -60,7 +62,7 @@ export const tokenStore = {
     ss.removeItem(USER_KEY);
   },
 
-  initFromStorage(): { token: string | null; user: { username: string; email: string } | null } {
+  initFromStorage(): { token: string | null; user: User | null } {
     const ss = safeSessionStorage();
     if (!ss) return { token: null, user: null };
     const token = ss.getItem(TOKEN_KEY);

@@ -32,9 +32,13 @@ async function handler(
   const qs = req.nextUrl.searchParams.toString();
   const backendUrl = `${BACKEND}/api/v1/auth/${segments.join('/')}${qs ? `?${qs}` : ''}`;
 
-  const forwardHeaders: Record<string, string> = {
-    'content-type': 'application/json',
-  };
+  const forwardHeaders: Record<string, string> = {};
+
+  const contentType = req.headers.get('content-type');
+  if (contentType) forwardHeaders['content-type'] = contentType;
+
+  const accept = req.headers.get('accept');
+  if (accept) forwardHeaders['accept'] = accept;
 
   const auth = req.headers.get('authorization');
   if (auth) forwardHeaders['authorization'] = auth;
@@ -56,6 +60,7 @@ async function handler(
     backendRes = await fetch(backendUrl, {
       method: req.method,
       headers: forwardHeaders,
+      redirect: 'manual',
       ...(body !== undefined ? { body } : {}),
     });
   } catch (err) {
@@ -67,9 +72,20 @@ async function handler(
 
   const responseText = await backendRes.text();
 
+  const responseHeaders = new Headers();
+  const responseContentType = backendRes.headers.get('content-type');
+  if (responseContentType) {
+    responseHeaders.set('content-type', responseContentType);
+  }
+
+  const location = backendRes.headers.get('location');
+  if (location) {
+    responseHeaders.set('location', location);
+  }
+
   const nextRes = new NextResponse(responseText, {
     status: backendRes.status,
-    headers: { 'content-type': 'application/json' },
+    headers: responseHeaders,
   });
 
   // Forward all set-cookie headers so refresh_token lands in browser.
